@@ -126,6 +126,8 @@ textarea:focus { outline: none; border-color: #58a6ff; }
   <h1>📈 MT4 Gold Backtest Visualizer</h1>
   <label class="filelabel" for="ohlcFile">📂 OHLCデータ</label>
   <input type="file" id="ohlcFile" accept=".csv,.txt">
+  <label class="filelabel" for="histFile">📂 口座履歴HTML</label>
+  <input type="file" id="histFile" accept=".html,.htm">
   <button class="btn" id="sampleBtn">サンプル生成</button>
   <button class="btn btn-gold" id="parseBtn">取引ログ反映</button>
   <span id="statusMsg">OHLCデータを読み込むか、サンプル生成してください</span>
@@ -263,6 +265,55 @@ function generateSample() {
     price = close;
     dt.setMinutes(dt.getMinutes() + 15);
   }
+}
+
+// ===== MT4 HTML HISTORY FILE =====
+document.getElementById('histFile').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    const csv = parseMT4Html(ev.target.result);
+    document.getElementById('tradeInput').value = csv;
+    parseTrades(csv);
+    updateStats();
+    render();
+    status(`口座履歴HTML読込: ${trades.length}件`);
+  };
+  r.readAsText(f, 'utf-8');
+});
+
+function parseMT4Html(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const rows = doc.querySelectorAll('tr');
+
+  const results = [];
+  results.push('Ticket,OpenTime,Type,Lots,OpenPrice,CloseTime,ClosePrice,Profit');
+
+  for (const row of rows) {
+    const cells = row.querySelectorAll('td');
+    if (cells.length < 14) continue;
+
+    const ticket   = cells[0].textContent.trim();
+    const openTime = cells[1].textContent.trim();
+    const type     = cells[2].textContent.trim().toLowerCase();
+    const lots     = cells[3].textContent.trim();
+    // cells[4] = Item (symbol)
+    const openPrice  = cells[5].textContent.trim();
+    // cells[6]=SL, cells[7]=TP
+    const closeTime  = cells[8].textContent.trim();
+    const closePrice = cells[9].textContent.trim();
+    // cells[10]=commission, cells[11]=taxes, cells[12]=swap
+    const profit = cells[13].textContent.trim().replace(/\s/g, '');
+
+    if (!ticket.match(/^\d+$/)) continue; // skip non-trade rows
+    if (!['buy','sell'].includes(type)) continue;
+
+    results.push(`${ticket},${openTime},${type},${lots},${openPrice},${closeTime},${closePrice},${profit}`);
+  }
+
+  return results.join('\n');
 }
 
 // ===== TRADES =====
