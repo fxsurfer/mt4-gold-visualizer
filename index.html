@@ -392,8 +392,7 @@ function parseTrades(text) {
     const closeTime = parseDateTime(c[5].trim());
     const closePrice= +c[6];
     const profit    = +c[7];
-    const lots = parseFloat(cols[3]);
-    // quoted fields対応: "2024.01.15 10:30" → 引用符除去済みのはずだが念のため
+    const lots = parseFloat(c[3]);
     if (!openTime || !['buy','sell'].includes(type) || isNaN(profit)) continue;
     trades.push({ openTime, closeTime, type, lots: isNaN(lots) ? null : lots, openPrice, closePrice, profit });
   }
