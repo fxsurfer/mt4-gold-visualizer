@@ -294,7 +294,7 @@ document.getElementById('histFile').addEventListener('change', e => {
       for (let i = 0; i < tmpAllRows.length && shown < 5; i++) {
         const cells = Array.from(tmpAllRows[i].querySelectorAll('td,th')).map(c => c.textContent.replace(/ /g,' ').trim());
         if (cells.length >= 8) {
-          console.log([DEBUG] 8col+ row + '(' + '' + 'col):', JSON.stringify(cells));
+          console.log('[DEBUG] 8col+row' + i + '(' + cells.length + 'col):', JSON.stringify(cells));
           shown++;
         }
       }
@@ -706,5 +706,6 @@ render();
 </script>
 </body>
 </html>
+
 
 
