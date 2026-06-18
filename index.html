@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -308,59 +308,53 @@ function parseMT4Html(html) {
   const results = [];
   results.push('Ticket,OpenTime,Type,Lots,OpenPrice,CloseTime,ClosePrice,Profit');
 
-  // MT4 HTMLの全テーブル行をスキャン
   const rows = doc.querySelectorAll('tr');
-  let colMap = null; // ヘッダーから列インデックスを動的検出
+  let colMap = null;
 
   for (const row of rows) {
     const cells = Array.from(row.querySelectorAll('td, th'))
-      .map(c => c.textContent.replace(/ /g, ' ').trim()); // &nbsp; → space
+      .map(c => c.textContent.replace(/ /g, ' ').trim());
 
-    if (!cells.length) continue;
+    // 8列未満はメタ情報行なのでスキップ
+    if (cells.length < 8) continue;
 
     const lower = cells.map(c => c.toLowerCase());
 
-    // ヘッダー行検出
-    if (lower.some(c => ['#','ticket','open time','type'].includes(c))) {
+    // ヘッダー行検出: 'type' かつ 'profit' or 'balance' を含む8列以上の行
+    if (lower.includes('type') && (lower.includes('profit') || lower.includes('balance'))) {
       colMap = {};
-      let isBT = false;
       lower.forEach((c, i) => {
-        if (c === '#' || c.includes('ticket'))              colMap.ticket   = i;
-        if (c === 'open time' || (c === 'time' && colMap.openTime == null)) colMap.openTime = i;
-        if (c === 'type')                                   colMap.type     = i;
-        if (['size','lots','volume'].includes(c))            colMap.lots     = i;
+        if ((c === '#' || c.includes('ticket') || c === 'order') && colMap.ticket == null) colMap.ticket = i;
+        if (c === 'open time' || (c === 'time' && colMap.openTime == null))                colMap.openTime = i;
+        if (c === 'type')                                                                   colMap.type = i;
+        if (['size','lots','volume'].includes(c))                                           colMap.lots = i;
         if (c === 'close time' || (c === 'time' && colMap.openTime != null && colMap.closeTime == null)) colMap.closeTime = i;
-        if (c === 'profit')                                 colMap.profit   = i;
-        if (c === 'balance')                                isBT            = true;
+        if (c === 'profit')                                                                 colMap.profit = i;
       });
       lower.forEach((c, i) => {
         if (c === 'price') {
-          if (colMap.openTime != null && i > colMap.openTime && colMap.openPrice == null)
-            colMap.openPrice = i;
-          else if (colMap.closeTime != null && i > colMap.closeTime && colMap.closePrice == null)
-            colMap.closePrice = i;
+          if (colMap.openTime  != null && i > colMap.openTime  && colMap.openPrice  == null) colMap.openPrice  = i;
+          else if (colMap.closeTime != null && i > colMap.closeTime && colMap.closePrice == null) colMap.closePrice = i;
         }
       });
-      // バックテスト形式: # Time Type Order Size Price S/L T/P Time Price Profit Balance
-      if (isBT && colMap.openPrice == null)
-        colMap = { ticket:0, openTime:1, type:2, lots:4, openPrice:5, closeTime:8, closePrice:9, profit:10 };
+      // フォールバック: バックテスト標準12列 # Time Type Order Size Price S/L T/P Time Price Profit Balance
+      if (colMap.openPrice == null || colMap.closePrice == null)
+        colMap = { ticket:3, openTime:1, type:2, lots:4, openPrice:5, closeTime:8, closePrice:9, profit:10 };
       continue;
     }
 
     // データ行
     const map = colMap ?? { ticket:0, openTime:1, type:2, lots:3, openPrice:5, closeTime:8, closePrice:9, profit:13 };
-    const ticket = cells[map.ticket ?? 0] ?? '';
-    if (!/^\d+$/.test(ticket)) continue;
-
-    const type      = (cells[map.type]      ?? '').toLowerCase();
+    const type = (cells[map.type] ?? '').toLowerCase();
     if (!['buy','sell'].includes(type)) continue;
 
-    const openTime   = cells[map.openTime]   ?? '';
-    const lots       = cells[map.lots]       ?? '';
-    const openPrice  = cells[map.openPrice]  ?? '';
-    const closeTime  = cells[map.closeTime]  ?? '';
-    const closePrice = cells[map.closePrice] ?? '';
-    const profit     = (cells[map.profit]    ?? '').replace(/[\s,]/g, '');
+    const ticket     = cells[map.ticket ?? 0] ?? '';
+    const openTime   = cells[map.openTime]    ?? '';
+    const lots       = cells[map.lots]        ?? '';
+    const openPrice  = cells[map.openPrice]   ?? '';
+    const closeTime  = cells[map.closeTime]   ?? '';
+    const closePrice = cells[map.closePrice]  ?? '';
+    const profit     = (cells[map.profit]     ?? '').replace(/[\s,]/g, '');
 
     if (!openTime || profit === '') continue;
 
@@ -369,14 +363,6 @@ function parseMT4Html(html) {
 
   return results.join('\n');
 }
-
-// ===== TRADES =====
-document.getElementById('parseBtn').addEventListener('click', () => {
-  parseTrades(document.getElementById('tradeInput').value);
-  updateStats();
-  render();
-});
-
 function splitCSVLine(line) {
   const cols = [];
   let cur = '', inQ = false;
@@ -716,3 +702,4 @@ render();
 </script>
 </body>
 </html>
+
