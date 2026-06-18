@@ -280,10 +280,16 @@ document.getElementById('histFile').addEventListener('change', e => {
   r.onload = ev => {
     const csv = parseMT4Html(ev.target.result);
     document.getElementById('tradeInput').value = csv;
+    const csvLines = csv.trim().split('\n').length - 1; // ヘッダー除く
     parseTrades(csv);
     updateStats();
     render();
-    status(`口座履歴HTML読込: ${trades.length}件`);
+    if (trades.length === 0) {
+      status(`⚠ HTML解析: ${csvLines}行生成 → 取引0件（日付形式を確認中）`);
+      console.log('[DEBUG] 生成CSV:', csv.slice(0, 500));
+    } else {
+      status(`口座履歴HTML読込: ${trades.length}件`);
+    }
   };
   r.readAsText(f, 'utf-8');
 });
