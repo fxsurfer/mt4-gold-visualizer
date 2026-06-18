@@ -130,8 +130,10 @@ textarea:focus { outline: none; border-color: #58a6ff; }
   <input type="file" id="histFile" accept=".html,.htm">
   <button class="btn" id="sampleBtn">サンプル生成</button>
   <button class="btn btn-gold" id="parseBtn">取引ログ反映</button>
+  <button class="btn" id="firstTrade">|◀ 最初</button>
   <button class="btn" id="prevTrade">◀ 前の取引</button>
   <button class="btn" id="nextTrade">次の取引 ▶</button>
+  <button class="btn" id="lastTrade">最新 ▶|</button>
   <span id="tradeNav" style="font-size:12px;color:#8b949e"></span>
   <span id="statusMsg">OHLCデータを読み込むか、サンプル生成してください</span>
   <div class="legend" style="margin-left:auto">
@@ -621,8 +623,10 @@ function jumpToTrade(idx) {
   render();
 }
 
+document.getElementById('firstTrade').addEventListener('click', () => jumpToTrade(0));
 document.getElementById('prevTrade').addEventListener('click', () => jumpToTrade(currentTradeIdx - 1));
 document.getElementById('nextTrade').addEventListener('click', () => jumpToTrade(currentTradeIdx + 1));
+document.getElementById('lastTrade').addEventListener('click', () => jumpToTrade(trades.length - 1));
 
 function status(msg) { document.getElementById('statusMsg').textContent = msg; }
 
