@@ -319,23 +319,53 @@ document.getElementById('histFile').addEventListener('change', e => {
 function parseMT4Html(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
+  const rows = Array.from(doc.querySelectorAll('tr'));
 
   const results = [];
   results.push('Ticket,OpenTime,Type,Lots,OpenPrice,CloseTime,ClosePrice,Profit');
 
-  const rows = doc.querySelectorAll('tr');
+  // --- 詳細イベント形式（バックテスト）判定 ---
+  // type列(col2)に "modify" や "s/l" "t/p" があれば詳細形式
+  const isDetailed = rows.some(r => {
+    const cells = Array.from(r.querySelectorAll('td,th')).map(c => c.textContent.trim());
+    return ['modify','s/l','t/p','close at stop'].includes((cells[2]||'').toLowerCase());
+  });
+
+  if (isDetailed) {
+    // 詳細形式: open行とclose行をticket(col3)で紐付け
+    // open: col0=#, col1=openTime, col2=buy/sell, col3=ticket, col4=lots, col5=openPrice
+    // close: col0=#, col1=closeTime, col2=t/p|s/l|close, col3=ticket, col4=lots, col5=closePrice, col8=profit
+    const opens = {}; // ticket -> {openTime, type, lots, openPrice}
+    for (const row of rows) {
+      const cells = Array.from(row.querySelectorAll('td,th')).map(c => c.textContent.replace(/ /g,' ').trim());
+      if (cells.length < 8) continue;
+      const type = (cells[2]||'').toLowerCase();
+      const ticket = cells[3] || '';
+      if (!ticket || !/^\d+$/.test(ticket)) continue;
+
+      if (['buy','sell'].includes(type)) {
+        opens[ticket] = { openTime: cells[1], type, lots: cells[4], openPrice: cells[5] };
+      } else if (['t/p','s/l','close','close at stop'].includes(type)) {
+        const open = opens[ticket];
+        if (!open) continue;
+        const closeTime  = cells[1];
+        const closePrice = cells[5];
+        const profit     = (cells[8]||'').replace(/[\s,]/g,'');
+        if (!closeTime || profit === '') continue;
+        results.push(`${ticket},"${open.openTime}",${open.type},${open.lots},${open.openPrice},"${closeTime}",${closePrice},${profit}`);
+        delete opens[ticket]; // 消費済み
+      }
+    }
+    return results.join('\n');
+  }
+
+  // --- 口座履歴形式（1行1トレード）---
   let colMap = null;
-
   for (const row of rows) {
-    const cells = Array.from(row.querySelectorAll('td, th'))
-      .map(c => c.textContent.replace(/ /g, ' ').trim());
-
-    // 8列未満はメタ情報行なのでスキップ
+    const cells = Array.from(row.querySelectorAll('td,th')).map(c => c.textContent.replace(/ /g,' ').trim());
     if (cells.length < 8) continue;
-
     const lower = cells.map(c => c.toLowerCase());
 
-    // ヘッダー行検出: 'type' かつ 'profit' or 'balance' を含む8列以上の行
     if (lower.includes('type') && (lower.includes('profit') || lower.includes('balance'))) {
       colMap = {};
       lower.forEach((c, i) => {
@@ -352,32 +382,27 @@ function parseMT4Html(html) {
           else if (colMap.closeTime != null && i > colMap.closeTime && colMap.closePrice == null) colMap.closePrice = i;
         }
       });
-      // フォールバック: バックテスト標準12列 # Time Type Order Size Price S/L T/P Time Price Profit Balance
       if (colMap.openPrice == null || colMap.closePrice == null)
-        colMap = { ticket:3, openTime:1, type:2, lots:4, openPrice:5, closeTime:8, closePrice:9, profit:10 };
+        colMap = { ticket:0, openTime:1, type:2, lots:3, openPrice:5, closeTime:8, closePrice:9, profit:13 };
       continue;
     }
 
-    // データ行
     const map = colMap ?? { ticket:0, openTime:1, type:2, lots:3, openPrice:5, closeTime:8, closePrice:9, profit:13 };
-    const type = (cells[map.type] ?? '').toLowerCase();
+    const type = (cells[map.type]||'').toLowerCase();
     if (!['buy','sell'].includes(type)) continue;
-
     const ticket     = cells[map.ticket ?? 0] ?? '';
     const openTime   = cells[map.openTime]    ?? '';
     const lots       = cells[map.lots]        ?? '';
     const openPrice  = cells[map.openPrice]   ?? '';
     const closeTime  = cells[map.closeTime]   ?? '';
     const closePrice = cells[map.closePrice]  ?? '';
-    const profit     = (cells[map.profit]     ?? '').replace(/[\s,]/g, '');
-
+    const profit     = (cells[map.profit]     ?? '').replace(/[\s,]/g,'');
     if (!openTime || profit === '') continue;
-
     results.push(`${ticket},"${openTime}",${type},${lots},${openPrice},"${closeTime}",${closePrice},${profit}`);
   }
-
   return results.join('\n');
 }
+
 function splitCSVLine(line) {
   const cols = [];
   let cur = '', inQ = false;
@@ -717,6 +742,7 @@ render();
 </script>
 </body>
 </html>
+
 
 
 
