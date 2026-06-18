@@ -126,7 +126,7 @@ textarea:focus { outline: none; border-color: #58a6ff; }
   <h1>📈 MT4 Gold Backtest Visualizer</h1>
   <label class="filelabel" for="ohlcFile">📂 OHLCデータ</label>
   <input type="file" id="ohlcFile" accept=".csv,.txt">
-  <label class="filelabel" for="histFile">📂 口座履歴HTML</label>
+  <label class="filelabel" for="histFile">📂 口座履歴 / バックテストHTML</label>
   <input type="file" id="histFile" accept=".html,.htm">
   <button class="btn" id="sampleBtn">サンプル生成</button>
   <button class="btn btn-gold" id="parseBtn">取引ログ反映</button>
@@ -311,19 +311,21 @@ function parseMT4Html(html) {
 
     if (!cells.length) continue;
 
-    // ヘッダー行を検出してcolMapを構築
     const lower = cells.map(c => c.toLowerCase());
-    if (lower.some(c => c.includes('ticket') || c.includes('open time') || c.includes('type'))) {
+
+    // ヘッダー行検出
+    if (lower.some(c => ['#','ticket','open time','type'].includes(c))) {
       colMap = {};
+      let isBT = false;
       lower.forEach((c, i) => {
-        if (c.includes('ticket') || c === '#')         colMap.ticket = i;
-        if (c.includes('open time'))                    colMap.openTime = i;
-        if (c === 'type')                               colMap.type = i;
-        if (c === 'size' || c === 'lots' || c === 'volume') colMap.lots = i;
-        if (c.includes('close time'))                   colMap.closeTime = i;
-        if (c === 'profit')                             colMap.profit = i;
+        if (c === '#' || c.includes('ticket'))              colMap.ticket   = i;
+        if (c === 'open time' || (c === 'time' && colMap.openTime == null)) colMap.openTime = i;
+        if (c === 'type')                                   colMap.type     = i;
+        if (['size','lots','volume'].includes(c))            colMap.lots     = i;
+        if (c === 'close time' || (c === 'time' && colMap.openTime != null && colMap.closeTime == null)) colMap.closeTime = i;
+        if (c === 'profit')                                 colMap.profit   = i;
+        if (c === 'balance')                                isBT            = true;
       });
-      // price列: open timeの次の "price" と close timeの次の "price"
       lower.forEach((c, i) => {
         if (c === 'price') {
           if (colMap.openTime != null && i > colMap.openTime && colMap.openPrice == null)
@@ -332,26 +334,28 @@ function parseMT4Html(html) {
             colMap.closePrice = i;
         }
       });
+      // バックテスト形式: # Time Type Order Size Price S/L T/P Time Price Profit Balance
+      if (isBT && colMap.openPrice == null)
+        colMap = { ticket:0, openTime:1, type:2, lots:4, openPrice:5, closeTime:8, closePrice:9, profit:10 };
       continue;
     }
 
-    // データ行: チケット番号が数字かチェック
-    const ticket = cells[colMap?.ticket ?? 0];
-    if (!ticket || !/^\d+$/.test(ticket)) continue;
+    // データ行
+    const map = colMap ?? { ticket:0, openTime:1, type:2, lots:3, openPrice:5, closeTime:8, closePrice:9, profit:13 };
+    const ticket = cells[map.ticket ?? 0] ?? '';
+    if (!/^\d+$/.test(ticket)) continue;
 
-    // colMapがない場合はデフォルト列順を試みる
-    const map = colMap || { ticket:0, openTime:1, type:2, lots:3, openPrice:5, closeTime:8, closePrice:9, profit:13 };
-
-    const openTime  = cells[map.openTime]  ?? '';
-    const type      = (cells[map.type] ?? '').toLowerCase();
-    const lots      = cells[map.lots]      ?? '';
-    const openPrice = cells[map.openPrice] ?? '';
-    const closeTime = cells[map.closeTime] ?? '';
-    const closePrice= cells[map.closePrice]?? '';
-    const profit    = (cells[map.profit]   ?? '').replace(/\s/g, '').replace(/,/g, '');
-
+    const type      = (cells[map.type]      ?? '').toLowerCase();
     if (!['buy','sell'].includes(type)) continue;
-    if (!openTime || !profit) continue;
+
+    const openTime   = cells[map.openTime]   ?? '';
+    const lots       = cells[map.lots]       ?? '';
+    const openPrice  = cells[map.openPrice]  ?? '';
+    const closeTime  = cells[map.closeTime]  ?? '';
+    const closePrice = cells[map.closePrice] ?? '';
+    const profit     = (cells[map.profit]    ?? '').replace(/[\s,]/g, '');
+
+    if (!openTime || profit === '') continue;
 
     results.push(`${ticket},"${openTime}",${type},${lots},${openPrice},"${closeTime}",${closePrice},${profit}`);
   }
