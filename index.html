@@ -183,6 +183,21 @@ textarea:focus { outline: none; border-color: #58a6ff; }
         Ticket,OpenTime,Type,Lots,<br>OpenPrice,CloseTime,ClosePrice,Profit
       </div>
     </div>
+
+    <div>
+      <div class="section-title">使い方</div>
+      <div class="hint">
+        <strong>① OHLCデータを用意する</strong><br>
+        MT4メニュー → ツール → 履歴センター → GOLD/USD → 該当時間足を選択 → エクスポート<br><br>
+        フォーマット例：<br>
+        <code style="background:#0d1117;padding:2px 4px;border-radius:3px;font-size:10px">2024.01.15,10:00,2048.50,2055.20,2045.30,2052.80,12345</code><br><br>
+        <strong>② 取引データを用意する</strong><br>
+        MT4 → ターミナル → 口座履歴タブ → 右クリック → 「全履歴を保存」<br><br>
+        ただしMT4のHTML形式をCSVに変換する必要があります。下記ヘッダーで自作でもOK：<br><br>
+        <code style="background:#0d1117;padding:2px 4px;border-radius:3px;font-size:10px">Ticket,OpenTime,Type,Lots,OpenPrice,CloseTime,ClosePrice,Profit</code><br><br>
+        Profit がプラスなら ✓ 利確、マイナスなら ✗ 損切りとして自動判定します。
+      </div>
+    </div>
   </div>
 </div>
 
