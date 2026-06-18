@@ -499,11 +499,23 @@ function render() {
       const x = toX(ci) + bodyW / 2;
       const c = candles[start + ci];
       if (tr.profit >= 0) {
-        ctx.fillStyle = '#3fb950';
-        ctx.fillText('✓', x, toY(c.h) - 4);
+        // 利確: 買いはTP上抜け→上、売りはTP下抜け→下
+        if (tr.type === 'buy') {
+          ctx.fillStyle = '#3fb950';
+          ctx.fillText('✓', x, toY(c.h) - 4);
+        } else {
+          ctx.fillStyle = '#3fb950';
+          ctx.fillText('✓', x, toY(c.l) + 14);
+        }
       } else {
-        ctx.fillStyle = '#f85149';
-        ctx.fillText('✗', x, toY(c.h) - 4);
+        // 損切り: 買いはSL下抜け→下、売りはSL上抜け→上
+        if (tr.type === 'buy') {
+          ctx.fillStyle = '#f85149';
+          ctx.fillText('✗', x, toY(c.l) + 14);
+        } else {
+          ctx.fillStyle = '#f85149';
+          ctx.fillText('✗', x, toY(c.h) - 4);
+        }
       }
     }
   }
