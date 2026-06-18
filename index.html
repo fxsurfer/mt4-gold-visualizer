@@ -291,31 +291,63 @@ document.getElementById('histFile').addEventListener('change', e => {
 function parseMT4Html(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
-  const rows = doc.querySelectorAll('tr');
 
   const results = [];
   results.push('Ticket,OpenTime,Type,Lots,OpenPrice,CloseTime,ClosePrice,Profit');
 
+  // MT4 HTMLの全テーブル行をスキャン
+  const rows = doc.querySelectorAll('tr');
+  let colMap = null; // ヘッダーから列インデックスを動的検出
+
   for (const row of rows) {
-    const cells = row.querySelectorAll('td');
-    if (cells.length < 14) continue;
+    const cells = Array.from(row.querySelectorAll('td, th'))
+      .map(c => c.textContent.replace(/ /g, ' ').trim()); // &nbsp; → space
 
-    const ticket   = cells[0].textContent.trim();
-    const openTime = cells[1].textContent.trim();
-    const type     = cells[2].textContent.trim().toLowerCase();
-    const lots     = cells[3].textContent.trim();
-    // cells[4] = Item (symbol)
-    const openPrice  = cells[5].textContent.trim();
-    // cells[6]=SL, cells[7]=TP
-    const closeTime  = cells[8].textContent.trim();
-    const closePrice = cells[9].textContent.trim();
-    // cells[10]=commission, cells[11]=taxes, cells[12]=swap
-    const profit = cells[13].textContent.trim().replace(/\s/g, '');
+    if (!cells.length) continue;
 
-    if (!ticket.match(/^\d+$/)) continue; // skip non-trade rows
+    // ヘッダー行を検出してcolMapを構築
+    const lower = cells.map(c => c.toLowerCase());
+    if (lower.some(c => c.includes('ticket') || c.includes('open time') || c.includes('type'))) {
+      colMap = {};
+      lower.forEach((c, i) => {
+        if (c.includes('ticket') || c === '#')         colMap.ticket = i;
+        if (c.includes('open time'))                    colMap.openTime = i;
+        if (c === 'type')                               colMap.type = i;
+        if (c === 'size' || c === 'lots' || c === 'volume') colMap.lots = i;
+        if (c.includes('close time'))                   colMap.closeTime = i;
+        if (c === 'profit')                             colMap.profit = i;
+      });
+      // price列: open timeの次の "price" と close timeの次の "price"
+      lower.forEach((c, i) => {
+        if (c === 'price') {
+          if (colMap.openTime != null && i > colMap.openTime && colMap.openPrice == null)
+            colMap.openPrice = i;
+          else if (colMap.closeTime != null && i > colMap.closeTime && colMap.closePrice == null)
+            colMap.closePrice = i;
+        }
+      });
+      continue;
+    }
+
+    // データ行: チケット番号が数字かチェック
+    const ticket = cells[colMap?.ticket ?? 0];
+    if (!ticket || !/^\d+$/.test(ticket)) continue;
+
+    // colMapがない場合はデフォルト列順を試みる
+    const map = colMap || { ticket:0, openTime:1, type:2, lots:3, openPrice:5, closeTime:8, closePrice:9, profit:13 };
+
+    const openTime  = cells[map.openTime]  ?? '';
+    const type      = (cells[map.type] ?? '').toLowerCase();
+    const lots      = cells[map.lots]      ?? '';
+    const openPrice = cells[map.openPrice] ?? '';
+    const closeTime = cells[map.closeTime] ?? '';
+    const closePrice= cells[map.closePrice]?? '';
+    const profit    = (cells[map.profit]   ?? '').replace(/\s/g, '').replace(/,/g, '');
+
     if (!['buy','sell'].includes(type)) continue;
+    if (!openTime || !profit) continue;
 
-    results.push(`${ticket},${openTime},${type},${lots},${openPrice},${closeTime},${closePrice},${profit}`);
+    results.push(`${ticket},"${openTime}",${type},${lots},${openPrice},"${closeTime}",${closePrice},${profit}`);
   }
 
   return results.join('\n');
@@ -328,12 +360,25 @@ document.getElementById('parseBtn').addEventListener('click', () => {
   render();
 });
 
+function splitCSVLine(line) {
+  const cols = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQ = !inQ; continue; }
+    if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; continue; }
+    cur += ch;
+  }
+  cols.push(cur.trim());
+  return cols;
+}
+
 function parseTrades(text) {
   trades = [];
   for (const line of text.trim().split('\n')) {
     const s = line.trim();
     if (!s || /ticket|opentime/i.test(s)) continue;
-    const c = s.split(/[,\t]/);
+    const c = splitCSVLine(s);
     if (c.length < 8) continue;
     const openTime  = parseDateTime(c[1].trim());
     const type      = c[2].trim().toLowerCase();
@@ -342,6 +387,7 @@ function parseTrades(text) {
     const closePrice= +c[6];
     const profit    = +c[7];
     const lots = parseFloat(cols[3]);
+    // quoted fields対応: "2024.01.15 10:30" → 引用符除去済みのはずだが念のため
     if (!openTime || !['buy','sell'].includes(type) || isNaN(profit)) continue;
     trades.push({ openTime, closeTime, type, lots: isNaN(lots) ? null : lots, openPrice, closePrice, profit });
   }
