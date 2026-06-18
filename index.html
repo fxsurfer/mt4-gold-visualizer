@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MT4 Gold Backtest Visualizer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0d1117;
+  color: #c9d1d9;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 14px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+header {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+h1 { font-size: 15px; color: #f0b429; margin-right: 6px; }
+.btn {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  padding: 5px 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.btn:hover { background: #30363d; }
+.btn-gold { background: #f0b429; color: #000; border-color: #f0b429; font-weight: 600; }
+.btn-gold:hover { background: #d4a017; }
+#statusMsg { font-size: 12px; color: #8b949e; margin-left: 4px; }
+.main-layout { flex: 1; display: flex; overflow: hidden; }
+#chartWrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+}
+canvas { display: block; cursor: crosshair; }
+#sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  background: #161b22;
+  border-left: 1px solid #30363d;
+  padding: 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e6edf3;
+  border-bottom: 1px solid #30363d;
+  padding-bottom: 5px;
+  margin-bottom: 8px;
+}
+label.filelabel {
+  display: inline-block;
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  padding: 5px 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+label.filelabel:hover { background: #30363d; }
+input[type="file"] { display: none; }
+textarea {
+  width: 100%;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  padding: 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: monospace;
+  resize: vertical;
+  min-height: 100px;
+}
+textarea:focus { outline: none; border-color: #58a6ff; }
+.stats { font-size: 12px; }
+.stat-row { display: flex; justify-content: space-between; padding: 2px 0; }
+.pos { color: #3fb950; }
+.neg { color: #f85149; }
+.hint { font-size: 11px; color: #8b949e; line-height: 1.9; }
+#tooltip {
+  position: absolute;
+  background: rgba(13,17,23,0.95);
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: monospace;
+  pointer-events: none;
+  display: none;
+  white-space: nowrap;
+  z-index: 10;
+  line-height: 1.7;
+}
+.legend {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+.legend span { display: flex; align-items: center; gap: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📈 MT4 Gold Backtest Visualizer</h1>
+  <label class="filelabel" for="ohlcFile">📂 OHLCデータ</label>
+  <input type="file" id="ohlcFile" accept=".csv,.txt">
+  <button class="btn" id="sampleBtn">サンプル生成</button>
+  <button class="btn btn-gold" id="parseBtn">取引ログ反映</button>
+  <span id="statusMsg">OHLCデータを読み込むか、サンプル生成してください</span>
+  <div class="legend" style="margin-left:auto">
+    <span><span style="color:#58a6ff">▲</span>買エントリー</span>
+    <span><span style="color:#ffa657">▼</span>売エントリー</span>
+    <span><span style="color:#3fb950">✓</span>利確</span>
+    <span><span style="color:#f85149">✗</span>損切り</span>
+  </div>
+</header>
+
+<div class="main-layout">
+  <div id="chartWrap">
+    <canvas id="chart"></canvas>
+    <div id="tooltip"></div>
+  </div>
+  <div id="sidebar">
+    <div>
+      <div class="section-title">取引ログ貼付け</div>
+      <div class="hint" style="margin-bottom:6px">
+        MT4バックテスト結果のCSVを貼り付けてください。<br>
+        ヘッダー行は自動スキップします。
+      </div>
+      <textarea id="tradeInput" placeholder="Ticket,OpenTime,Type,Lots,OpenPrice,CloseTime,ClosePrice,Profit
+10001,2024.01.15 10:30,buy,0.10,2048.50,2024.01.15 14:20,2063.80,154.00
+10002,2024.01.16 09:00,sell,0.15,2071.20,2024.01.16 11:30,2078.60,-114.00"></textarea>
+    </div>
+
+    <div>
+      <div class="section-title">統計</div>
+      <div class="stats" id="statsPanel">
+        <div class="hint">取引ログを読み込むと表示されます</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">操作方法</div>
+      <div class="hint">
+        🖱 ホイール → ズームイン/アウト<br>
+        🖱 ドラッグ → 左右スクロール<br>
+        🖱 ホバー → OHLC詳細表示<br>
+        ▲ 青 = 買いエントリー<br>
+        ▼ 橙 = 売りエントリー<br>
+        ✓ 緑 = 利確クローズ<br>
+        ✗ 赤 = 損切りクローズ
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">データ形式</div>
+      <div class="hint">
+        <strong>OHLC CSV（MT4履歴センター）</strong><br>
+        日付,時刻,始値,高値,安値,終値,出来高<br><br>
+        <strong>取引ログ CSV</strong><br>
+        Ticket,OpenTime,Type,Lots,<br>OpenPrice,CloseTime,ClosePrice,Profit
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+let candles = [];
+let trades = [];
+let viewStart = 0;
+let candleW = 10;
+const GAP = 0.2;
+let dragging = false, dragX0 = 0, dragView0 = 0;
+
+// ===== OHLC FILE =====
+document.getElementById('ohlcFile').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    parseOHLC(ev.target.result);
+    status(`OHLC: ${candles.length}本読込`);
+    resetView();
+    render();
+  };
+  r.readAsText(f, 'utf-8');
+});
+
+function parseOHLC(text) {
+  candles = [];
+  for (const line of text.trim().split('\n')) {
+    const c = line.trim().split(/[,\t]/);
+    if (c.length < 6) continue;
+    // date,time,open,high,low,close[,vol]
+    const dt = parseDateTime(c[0].trim() + ' ' + c[1].trim());
+    const o = +c[2], h = +c[3], l = +c[4], cl = +c[5];
+    if (!dt || isNaN(o) || isNaN(cl)) continue;
+    candles.push({ t: dt, o, h, l, c: cl });
+  }
+  candles.sort((a, b) => a.t - b.t);
+}
+
+// ===== SAMPLE DATA =====
+document.getElementById('sampleBtn').addEventListener('click', () => {
+  generateSample();
+  status(`サンプルデータ: ${candles.length}本`);
+  resetView();
+  render();
+});
+
+function generateSample() {
+  candles = [];
+  // Generate ~2000 M15 candles starting 2024-01-01
+  let price = 2050;
+  const dt = new Date(2024, 0, 1, 8, 0, 0);
+  for (let i = 0; i < 2000; i++) {
+    // Skip weekends
+    while (dt.getDay() === 0 || dt.getDay() === 6) dt.setMinutes(dt.getMinutes() + 15);
+    const open = price;
+    const move = (Math.random() - 0.48) * 8;
+    const close = open + move;
+    const high = Math.max(open, close) + Math.random() * 5;
+    const low = Math.min(open, close) - Math.random() * 5;
+    candles.push({ t: new Date(dt), o: +open.toFixed(2), h: +high.toFixed(2), l: +low.toFixed(2), c: +close.toFixed(2) });
+    price = close;
+    dt.setMinutes(dt.getMinutes() + 15);
+  }
+}
+
+// ===== TRADES =====
+document.getElementById('parseBtn').addEventListener('click', () => {
+  parseTrades(document.getElementById('tradeInput').value);
+  updateStats();
+  render();
+});
+
+function parseTrades(text) {
+  trades = [];
+  for (const line of text.trim().split('\n')) {
+    const s = line.trim();
+    if (!s || /ticket|opentime/i.test(s)) continue;
+    const c = s.split(/[,\t]/);
+    if (c.length < 8) continue;
+    const openTime  = parseDateTime(c[1].trim());
+    const type      = c[2].trim().toLowerCase();
+    const openPrice = +c[4];
+    const closeTime = parseDateTime(c[5].trim());
+    const closePrice= +c[6];
+    const profit    = +c[7];
+    if (!openTime || !['buy','sell'].includes(type) || isNaN(profit)) continue;
+    trades.push({ openTime, closeTime, type, openPrice, closePrice, profit });
+  }
+  status(`取引: ${trades.length}件読込`);
+}
+
+function updateStats() {
+  if (!trades.length) return;
+  const wins   = trades.filter(t => t.profit > 0);
+  const losses = trades.filter(t => t.profit <= 0);
+  const total  = trades.reduce((s, t) => s + t.profit, 0);
+  const wr     = (wins.length / trades.length * 100).toFixed(1);
+  const avgW   = wins.length   ? (wins.reduce((s,t)=>s+t.profit,0)/wins.length).toFixed(2)   : '–';
+  const avgL   = losses.length ? (losses.reduce((s,t)=>s+t.profit,0)/losses.length).toFixed(2) : '–';
+  document.getElementById('statsPanel').innerHTML = `
+    <div class="stat-row"><span>取引数</span><span>${trades.length}</span></div>
+    <div class="stat-row"><span>総損益</span><span class="${total>=0?'pos':'neg'}">${total>=0?'+':''}$${total.toFixed(2)}</span></div>
+    <div class="stat-row"><span>勝率</span><span>${wr}%</span></div>
+    <div class="stat-row"><span>勝ち / 負け</span><span><span class="pos">${wins.length}</span> / <span class="neg">${losses.length}</span></span></div>
+    <div class="stat-row"><span>平均利益</span><span class="pos">+$${avgW}</span></div>
+    <div class="stat-row"><span>平均損失</span><span class="neg">$${avgL}</span></div>
+  `;
+}
+
+// ===== DATE PARSE =====
+function parseDateTime(s) {
+  const m = s.match(/(\d{4})[.\-\/](\d{2})[.\-\/](\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return null;
+  return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +(m[6]||0));
+}
+
+// ===== CANVAS =====
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const wrap = document.getElementById('chartWrap');
+  canvas.width  = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+}
+
+function resetView() {
+  candleW = Math.max(3, Math.min(12, canvas.width / Math.max(candles.length, 1)));
+  viewStart = Math.max(0, candles.length - Math.floor(canvas.width / candleW));
+}
+
+function visibleRange() {
+  const count = Math.floor((canvas.width - 65) / candleW);
+  const start = Math.max(0, Math.min(viewStart, candles.length - 1));
+  const end   = Math.min(candles.length, start + count);
+  return { start, end };
+}
+
+function priceRange(start, end) {
+  let lo = Infinity, hi = -Infinity;
+  for (let i = start; i < end; i++) {
+    if (candles[i].l < lo) lo = candles[i].l;
+    if (candles[i].h > hi) hi = candles[i].h;
+  }
+  // Extend for markers
+  const pad = (hi - lo) * 0.15;
+  return { lo: lo - pad, hi: hi + pad };
+}
+
+function render() {
+  resizeCanvas();
+  const W = canvas.width, H = canvas.height;
+  const MARGIN_R = 65, MARGIN_B = 24;
+  const chartW = W - MARGIN_R, chartH = H - MARGIN_B;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!candles.length) {
+    ctx.fillStyle = '#8b949e';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('「サンプル生成」またはOHLCファイルを読み込んでください', W/2, H/2);
+    return;
+  }
+
+  const { start, end } = visibleRange();
+  const { lo, hi } = priceRange(start, end);
+  const bodyW = candleW * (1 - GAP);
+
+  function toX(vi) { return vi * candleW + candleW * GAP / 2; }
+  function toY(p)  { return chartH - (p - lo) / (hi - lo) * chartH; }
+
+  // --- Grid ---
+  const step = niceStep(hi - lo, 6);
+  ctx.strokeStyle = '#1e2430';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = '#8b949e';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'left';
+  for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) {
+    const y = toY(p);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
+    ctx.fillText(p.toFixed(2), chartW + 4, y + 4);
+  }
+
+  // --- Time axis ---
+  ctx.fillStyle = '#8b949e';
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'center';
+  const labelEvery = Math.max(1, Math.round(60 / candleW)); // ~every 60px
+  for (let i = 0; i < end - start; i++) {
+    if (i % labelEvery !== 0) continue;
+    const c = candles[start + i];
+    const x = toX(i) + bodyW / 2;
+    const label = `${String(c.t.getMonth()+1).padStart(2,'0')}/${String(c.t.getDate()).padStart(2,'0')} ${String(c.t.getHours()).padStart(2,'0')}:${String(c.t.getMinutes()).padStart(2,'0')}`;
+    ctx.fillText(label, x, H - 6);
+  }
+
+  // --- Candles ---
+  for (let i = 0; i < end - start; i++) {
+    const c = candles[start + i];
+    const x = toX(i);
+    const bull = c.c >= c.o;
+    const col = bull ? '#3fb950' : '#f85149';
+
+    ctx.strokeStyle = col; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + bodyW/2, toY(c.h));
+    ctx.lineTo(x + bodyW/2, toY(c.l));
+    ctx.stroke();
+
+    const y1 = toY(Math.max(c.o, c.c));
+    const y2 = toY(Math.min(c.o, c.c));
+    ctx.fillStyle = bull ? '#3fb950' : '#f85149';
+    ctx.fillRect(x, y1, bodyW, Math.max(y2 - y1, 1));
+  }
+
+  // --- Trade markers ---
+  ctx.font = `bold ${Math.max(10, Math.min(14, candleW * 1.4))}px sans-serif`;
+  ctx.textAlign = 'center';
+
+  for (const tr of trades) {
+    const ei = findCandle(tr.openTime, start, end);
+    const ci = findCandle(tr.closeTime, start, end);
+
+    if (ei >= 0) {
+      const x = toX(ei) + bodyW / 2;
+      const c = candles[start + ei];
+      if (tr.type === 'buy') {
+        ctx.fillStyle = '#58a6ff';
+        ctx.fillText('▲', x, toY(c.l) + 14);
+      } else {
+        ctx.fillStyle = '#ffa657';
+        ctx.fillText('▼', x, toY(c.h) - 4);
+      }
+    }
+
+    if (ci >= 0) {
+      const x = toX(ci) + bodyW / 2;
+      const c = candles[start + ci];
+      if (tr.profit >= 0) {
+        ctx.fillStyle = '#3fb950';
+        ctx.fillText('✓', x, toY(c.h) - 4);
+      } else {
+        ctx.fillStyle = '#f85149';
+        ctx.fillText('✗', x, toY(c.h) - 4);
+      }
+    }
+  }
+
+  // Store helpers for mouse events
+  canvas._toY  = toY;
+  canvas._toX  = toX;
+  canvas._lo   = lo; canvas._hi = hi;
+  canvas._chartH = chartH;
+  canvas._start = start; canvas._end = end;
+  canvas._bodyW = bodyW;
+}
+
+function findCandle(t, start, end) {
+  if (!t) return -1;
+  const ms = t.getTime();
+  let best = -1, bestDiff = Infinity;
+  for (let i = start; i < end; i++) {
+    const d = Math.abs(candles[i].t.getTime() - ms);
+    if (d < bestDiff) { bestDiff = d; best = i - start; }
+  }
+  // Only show if within 2 candle widths in time
+  return best;
+}
+
+function niceStep(range, n) {
+  const r = range / n;
+  const mag = Math.pow(10, Math.floor(Math.log10(r)));
+  const norm = r / mag;
+  return (norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10) * mag;
+}
+
+// ===== MOUSE EVENTS =====
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const { start } = visibleRange();
+  const hoverIdx = start + Math.floor(e.offsetX / candleW);
+  const factor = e.deltaY < 0 ? 1.12 : 1/1.12;
+  candleW = Math.max(2, Math.min(50, candleW * factor));
+  viewStart = Math.max(0, hoverIdx - Math.floor(e.offsetX / candleW));
+  render();
+}, { passive: false });
+
+canvas.addEventListener('mousedown', e => {
+  dragging = true; dragX0 = e.offsetX; dragView0 = viewStart;
+});
+canvas.addEventListener('mousemove', e => {
+  if (dragging) {
+    viewStart = Math.max(0, Math.floor(dragView0 + (dragX0 - e.offsetX) / candleW));
+    render();
+  }
+  showTooltip(e);
+});
+canvas.addEventListener('mouseup', () => dragging = false);
+canvas.addEventListener('mouseleave', () => {
+  dragging = false;
+  document.getElementById('tooltip').style.display = 'none';
+});
+
+function showTooltip(e) {
+  if (!candles.length || !canvas._start) return;
+  const { start, end } = visibleRange();
+  const vi = Math.floor(e.offsetX / candleW);
+  const idx = start + vi;
+  if (idx < 0 || idx >= end) return;
+  const c = candles[idx];
+  const bull = c.c >= c.o;
+
+  // Check for trade at this candle
+  let tradeInfo = '';
+  for (const tr of trades) {
+    const ei = findCandle(tr.openTime, start, end);
+    const ci = findCandle(tr.closeTime, start, end);
+    if (ei === vi || ci === vi) {
+      const side = tr.type === 'buy' ? '買' : '売';
+      const result = tr.profit >= 0 ? `<span class="pos">+$${tr.profit.toFixed(2)}</span>` : `<span class="neg">$${tr.profit.toFixed(2)}</span>`;
+      tradeInfo += `<br>${side} ${tr.openPrice} → ${tr.closePrice} ${result}`;
+    }
+  }
+
+  const pad2 = n => String(n).padStart(2,'0');
+  const tstr = `${c.t.getFullYear()}.${pad2(c.t.getMonth()+1)}.${pad2(c.t.getDate())} ${pad2(c.t.getHours())}:${pad2(c.t.getMinutes())}`;
+
+  const tt = document.getElementById('tooltip');
+  tt.innerHTML = `<span style="color:#8b949e">${tstr}</span><br>
+O:<b style="color:#c9d1d9"> ${c.o.toFixed(2)}</b>
+H:<b style="color:#3fb950"> ${c.h.toFixed(2)}</b>
+L:<b style="color:#f85149"> ${c.l.toFixed(2)}</b>
+C:<b style="color:${bull?'#3fb950':'#f85149'}"> ${c.c.toFixed(2)}</b>${tradeInfo}`;
+
+  let tx = e.offsetX + 14, ty = e.offsetY - 10;
+  if (tx + 200 > canvas.width) tx = e.offsetX - 200;
+  tt.style.left = tx + 'px';
+  tt.style.top  = ty + 'px';
+  tt.style.display = 'block';
+}
+
+function status(msg) { document.getElementById('statusMsg').textContent = msg; }
+
+window.addEventListener('resize', render);
+
+// Initial render
+render();
+</script>
+</body>
+</html>
