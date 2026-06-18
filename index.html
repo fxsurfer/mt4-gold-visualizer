@@ -130,6 +130,9 @@ textarea:focus { outline: none; border-color: #58a6ff; }
   <input type="file" id="histFile" accept=".html,.htm">
   <button class="btn" id="sampleBtn">サンプル生成</button>
   <button class="btn btn-gold" id="parseBtn">取引ログ反映</button>
+  <button class="btn" id="prevTrade">◀ 前の取引</button>
+  <button class="btn" id="nextTrade">次の取引 ▶</button>
+  <span id="tradeNav" style="font-size:12px;color:#8b949e"></span>
   <span id="statusMsg">OHLCデータを読み込むか、サンプル生成してください</span>
   <div class="legend" style="margin-left:auto">
     <span><span style="color:#58a6ff">▲</span>買エントリー</span>
@@ -595,6 +598,31 @@ C:<b style="color:${bull?'#3fb950':'#f85149'}"> ${c.c.toFixed(2)}</b>${tradeInfo
   tt.style.top  = ty + 'px';
   tt.style.display = 'block';
 }
+
+// ===== TRADE NAVIGATION =====
+let currentTradeIdx = -1;
+
+function jumpToTrade(idx) {
+  if (!trades.length) return;
+  currentTradeIdx = Math.max(0, Math.min(trades.length - 1, idx));
+  const tr = trades[currentTradeIdx];
+  const t = tr.openTime;
+  // Find candle index for this trade
+  let best = 0, bestDiff = Infinity;
+  for (let i = 0; i < candles.length; i++) {
+    const d = Math.abs(candles[i].t.getTime() - t.getTime());
+    if (d < bestDiff) { bestDiff = d; best = i; }
+  }
+  // Center the view on this candle
+  const visible = Math.floor((canvas.width - 65) / candleW);
+  viewStart = Math.max(0, best - Math.floor(visible / 2));
+  document.getElementById('tradeNav').textContent =
+    `${currentTradeIdx + 1} / ${trades.length}件  ${tr.type === 'buy' ? '▲買' : '▼売'}  ${tr.profit >= 0 ? '+' : ''}$${tr.profit.toFixed(2)}`;
+  render();
+}
+
+document.getElementById('prevTrade').addEventListener('click', () => jumpToTrade(currentTradeIdx - 1));
+document.getElementById('nextTrade').addEventListener('click', () => jumpToTrade(currentTradeIdx + 1));
 
 function status(msg) { document.getElementById('statusMsg').textContent = msg; }
 
