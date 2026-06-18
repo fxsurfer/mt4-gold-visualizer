@@ -287,13 +287,17 @@ document.getElementById('histFile').addEventListener('change', e => {
     if (trades.length === 0) {
       status(`⚠ HTML解析: ${csvLines}行生成 → 取引0件`);
       console.log('[DEBUG] 生成CSV:', csv.slice(0, 500));
-      const tmpDoc = new DOMParser().parseFromString(ev.target.result, 'text/html');
-      const tmpRows = tmpDoc.querySelectorAll('tr');
-      console.log('[DEBUG] テーブル行数:', tmpRows.length);
-      Array.from(tmpRows).slice(0, 8).forEach((r, i) => {
-        const cells = Array.from(r.querySelectorAll('td,th')).map(c => c.textContent.replace(/ /g,' ').trim());
-        console.log(`[DEBUG] row${i}(${cells.length}列):`, JSON.stringify(cells));
-      });
+        const tmpDoc = new DOMParser().parseFromString(ev.target.result, 'text/html');
+      const tmpAllRows = Array.from(tmpDoc.querySelectorAll('tr'));
+      console.log('[DEBUG] 総行数:', tmpAllRows.length);
+      let shown = 0;
+      for (let i = 0; i < tmpAllRows.length && shown < 5; i++) {
+        const cells = Array.from(tmpAllRows[i].querySelectorAll('td,th')).map(c => c.textContent.replace(/ /g,' ').trim());
+        if (cells.length >= 8) {
+          console.log([DEBUG] 8col+ row + '(' + '' + 'col):', JSON.stringify(cells));
+          shown++;
+        }
+      }
     } else {
       status(`口座履歴HTML読込: ${trades.length}件`);
     }
@@ -702,4 +706,5 @@ render();
 </script>
 </body>
 </html>
+
 
