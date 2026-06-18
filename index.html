@@ -341,8 +341,9 @@ function parseTrades(text) {
     const closeTime = parseDateTime(c[5].trim());
     const closePrice= +c[6];
     const profit    = +c[7];
+    const lots = parseFloat(cols[3]);
     if (!openTime || !['buy','sell'].includes(type) || isNaN(profit)) continue;
-    trades.push({ openTime, closeTime, type, openPrice, closePrice, profit });
+    trades.push({ openTime, closeTime, type, lots: isNaN(lots) ? null : lots, openPrice, closePrice, profit });
   }
   status(`取引: ${trades.length}件読込`);
 }
@@ -592,7 +593,8 @@ function showTooltip(e) {
     if (ei === vi || ci === vi) {
       const side = tr.type === 'buy' ? '買' : '売';
       const result = tr.profit >= 0 ? `<span class="pos">+$${tr.profit.toFixed(2)}</span>` : `<span class="neg">$${tr.profit.toFixed(2)}</span>`;
-      tradeInfo += `<br>${side} ${tr.openPrice} → ${tr.closePrice} ${result}`;
+      const lots = tr.lots != null ? ` ${tr.lots}lot` : '';
+      tradeInfo += `<br>${side}${lots} ${tr.openPrice} → ${tr.closePrice} ${result}`;
     }
   }
 
