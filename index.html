@@ -290,12 +290,23 @@ document.getElementById('histFile').addEventListener('change', e => {
         const tmpDoc = new DOMParser().parseFromString(ev.target.result, 'text/html');
       const tmpAllRows = Array.from(tmpDoc.querySelectorAll('tr'));
       console.log('[DEBUG] 総行数:', tmpAllRows.length);
+      // 最初の8列+行を5件
       let shown = 0;
       for (let i = 0; i < tmpAllRows.length && shown < 5; i++) {
         const cells = Array.from(tmpAllRows[i].querySelectorAll('td,th')).map(c => c.textContent.replace(/ /g,' ').trim());
         if (cells.length >= 8) {
-          console.log('[DEBUG] 8col+row' + i + '(' + cells.length + 'col):', JSON.stringify(cells));
+          console.log('[DEBUG] open row' + i + ':', JSON.stringify(cells));
           shown++;
+        }
+      }
+      // t/p or s/l の行を5件探す（close行の形式確認）
+      let cshown = 0;
+      for (let i = 0; i < tmpAllRows.length && cshown < 5; i++) {
+        const cells = Array.from(tmpAllRows[i].querySelectorAll('td,th')).map(c => c.textContent.replace(/ /g,' ').trim());
+        const t = (cells[2] || '').toLowerCase();
+        if (['t/p','s/l','close','close at stop'].includes(t)) {
+          console.log('[DEBUG] close row' + i + ':', JSON.stringify(cells));
+          cshown++;
         }
       }
     } else {
