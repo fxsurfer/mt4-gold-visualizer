@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MT4バックテスト可視化ツール｜デモ版</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0d1117;
+  color: #c9d1d9;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 14px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#demoBanner {
+  background: linear-gradient(90deg, #1a2a0a, #0a1f35);
+  border-bottom: 2px solid #f0b429;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+#demoBanner .badge {
+  background: #f0b429;
+  color: #000;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+#demoBanner .msg { color: #c9d1d9; }
+#demoBanner .msg strong { color: #f0b429; }
+#demoBanner a {
+  margin-left: auto;
+  background: #f0b429;
+  color: #000;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+#demoBanner a:hover { background: #d4a017; }
+header {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+h1 { font-size: 15px; color: #f0b429; margin-right: 4px; }
+.btn {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  padding: 5px 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.btn:hover { background: #30363d; }
+.btn-nav { background: #0a1f35; border-color: #58a6ff; color: #58a6ff; }
+.btn-nav:hover { background: #0d2a47; }
+#statusMsg { font-size: 12px; color: #3fb950; margin-left: 4px; font-weight: 600; }
+#tradeNav { font-size: 12px; color: #f0b429; font-weight: 600; }
+.legend {
+  display: flex; gap: 10px; font-size: 11px; flex-wrap: wrap; margin-left: auto;
+}
+.legend span { display: flex; align-items: center; gap: 3px; }
+.main-layout { flex: 1; display: flex; overflow: hidden; }
+#chartWrap { flex: 1; position: relative; overflow: hidden; min-width: 0; }
+canvas { display: block; cursor: crosshair; }
+#sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: #161b22;
+  border-left: 1px solid #30363d;
+  padding: 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.section-title {
+  font-size: 12px; font-weight: 600; color: #e6edf3;
+  border-bottom: 1px solid #30363d; padding-bottom: 5px; margin-bottom: 8px;
+}
+.stats { font-size: 12px; }
+.stat-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #1e2430; }
+.stat-row:last-child { border-bottom: none; }
+.pos { color: #3fb950; } .neg { color: #f85149; }
+.hint { font-size: 11px; color: #8b949e; line-height: 1.9; }
+#tooltip {
+  position: absolute; background: rgba(13,17,23,0.95);
+  border: 1px solid #30363d; border-radius: 6px;
+  padding: 7px 10px; font-size: 12px; font-family: monospace;
+  pointer-events: none; display: none; white-space: nowrap; z-index: 10; line-height: 1.7;
+}
+.demo-cta {
+  background: linear-gradient(135deg, #0a1f35, #1a2a0a);
+  border: 1px solid #f0b429;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+.demo-cta p { font-size: 11px; color: #aaaacc; margin-bottom: 8px; line-height: 1.6; }
+.demo-cta a {
+  display: block;
+  background: #f0b429;
+  color: #000;
+  font-weight: 700;
+  padding: 8px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 12px;
+}
+.demo-cta a:hover { background: #d4a017; }
+.trade-list { font-size: 11px; max-height: 200px; overflow-y: auto; }
+.trade-item {
+  padding: 4px 6px; border-radius: 4px; margin-bottom: 2px;
+  cursor: pointer; display: flex; justify-content: space-between;
+  border: 1px solid transparent;
+}
+.trade-item:hover { background: #21262d; border-color: #30363d; }
+.trade-item.active { background: #0d2a47; border-color: #58a6ff; }
+</style>
+</head>
+<body>
+
+<div id="demoBanner">
+  <span class="badge">DEMO</span>
+  <span class="msg">これはサンプルデータによる<strong>体験デモ版</strong>です。MT4のバックテストHTMLを読み込む<strong>製品版</strong>はゴゴジャンで販売中。</span>
+  <a href="https://www.gogojungle.co.jp/tools/indicators/81440" target="_blank">製品版を購入 ¥4,980 →</a>
+</div>
+
+<header>
+  <h1>📈 MT4 Gold Backtest Visualizer</h1>
+  <button class="btn btn-nav" id="firstTrade">|◀ 最初</button>
+  <button class="btn btn-nav" id="prevTrade">◀ 前の取引</button>
+  <button class="btn btn-nav" id="nextTrade">次の取引 ▶</button>
+  <button class="btn btn-nav" id="lastTrade">最新 ▶|</button>
+  <span id="tradeNav"></span>
+  <span id="statusMsg">サンプルデータ読み込み済み</span>
+  <div class="legend">
+    <span><span style="color:#58a6ff">▲</span>買エントリー</span>
+    <span><span style="color:#ffa657">▼</span>売エントリー</span>
+    <span><span style="color:#3fb950">✓</span>利確</span>
+    <span><span style="color:#f85149">✗</span>損切り</span>
+  </div>
+</header>
+
+<div class="main-layout">
+  <div id="chartWrap">
+    <canvas id="chart"></canvas>
+    <div id="tooltip"></div>
+  </div>
+  <div id="sidebar">
+
+    <div>
+      <div class="section-title">統計（サンプル）</div>
+      <div class="stats" id="statsPanel"></div>
+    </div>
+
+    <div>
+      <div class="section-title">取引一覧</div>
+      <div class="trade-list" id="tradeList"></div>
+    </div>
+
+    <div>
+      <div class="section-title">操作方法</div>
+      <div class="hint">
+        🖱 ホイール → ズームイン/アウト<br>
+        🖱 ドラッグ → 左右スクロール<br>
+        🖱 ホバー → OHLC・取引詳細<br>
+        ◀ ▶ ボタン → 取引間ジャンプ<br><br>
+        ▲ 青 = 買いエントリー<br>
+        ▼ 橙 = 売りエントリー<br>
+        ✓ 緑 = 利確クローズ<br>
+        ✗ 赤 = 損切りクローズ
+      </div>
+    </div>
+
+    <div class="demo-cta">
+      <p>
+        製品版では<strong style="color:#f0b429">あなたのMT4バックテスト</strong>を読み込んで同様に分析できます。
+        バックテスト結果HTML / 口座履歴HTML 両対応。
+      </p>
+      <a href="https://www.gogojungle.co.jp/tools/indicators/81440" target="_blank">ゴゴジャンで購入 ¥4,980</a>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ===== GENERATE REALISTIC GOLD SAMPLE DATA =====
+let candles = [];
+let trades = [];
+let viewStart = 0;
+let candleW = 10;
+const GAP = 0.2;
+let dragging = false, dragX0 = 0, dragView0 = 0;
+
+function generateSample() {
+  candles = [];
+  // Realistic GOLD M15 data ~ 2024.01 range around 2000-2100
+  let price = 2063.50;
+  const dt = new Date(2024, 0, 2, 8, 0, 0);
+  const seed = [
+    0.3,0.8,-0.4,1.2,-0.6,0.9,1.5,-0.3,0.7,-1.1,
+    0.4,1.8,-0.9,0.6,-1.4,1.1,-0.5,0.8,1.3,-0.7
+  ];
+  let si = 0;
+  for (let i = 0; i < 480; i++) {
+    while (dt.getDay() === 0 || dt.getDay() === 6 ||
+           (dt.getHours() < 1 || dt.getHours() >= 23)) {
+      dt.setMinutes(dt.getMinutes() + 15);
+    }
+    const open = price;
+    const trend = seed[si++ % seed.length];
+    const noise = (Math.random() - 0.5) * 4;
+    const move = trend * 2.5 + noise;
+    const close = open + move;
+    const wick = Math.random() * 3 + 1;
+    const high = Math.max(open, close) + wick;
+    const low  = Math.min(open, close) - wick;
+    candles.push({ t: new Date(dt), o: +open.toFixed(2), h: +high.toFixed(2), l: +low.toFixed(2), c: +close.toFixed(2) });
+    price = close;
+    dt.setMinutes(dt.getMinutes() + 15);
+  }
+  candles.sort((a, b) => a.t - b.t);
+}
+
+function generateTrades() {
+  // 20 realistic trades on the candles
+  const tradeData = [
+    { openIdx:  12, closeIdx:  28, type: 'buy',  lots: 0.10, profit:  132.50 },
+    { openIdx:  35, closeIdx:  42, type: 'buy',  lots: 0.10, profit:  -48.00 },
+    { openIdx:  55, closeIdx:  80, type: 'buy',  lots: 0.10, profit:  215.30 },
+    { openIdx:  88, closeIdx:  96, type: 'sell', lots: 0.10, profit:   76.20 },
+    { openIdx: 102, closeIdx: 108, type: 'buy',  lots: 0.10, profit:  -52.40 },
+    { openIdx: 118, closeIdx: 145, type: 'buy',  lots: 0.10, profit:  288.00 },
+    { openIdx: 152, closeIdx: 159, type: 'sell', lots: 0.10, profit:   94.10 },
+    { openIdx: 165, closeIdx: 172, type: 'buy',  lots: 0.10, profit:  -45.00 },
+    { openIdx: 180, closeIdx: 210, type: 'buy',  lots: 0.10, profit:  342.80 },
+    { openIdx: 218, closeIdx: 225, type: 'sell', lots: 0.10, profit:  -61.50 },
+    { openIdx: 235, closeIdx: 258, type: 'buy',  lots: 0.10, profit:  196.40 },
+    { openIdx: 265, closeIdx: 272, type: 'sell', lots: 0.10, profit:  108.20 },
+    { openIdx: 280, closeIdx: 286, type: 'buy',  lots: 0.10, profit:  -43.80 },
+    { openIdx: 295, closeIdx: 328, type: 'buy',  lots: 0.10, profit:  412.60 },
+    { openIdx: 335, closeIdx: 341, type: 'sell', lots: 0.10, profit:   82.30 },
+    { openIdx: 350, closeIdx: 356, type: 'buy',  lots: 0.10, profit:  -55.70 },
+    { openIdx: 365, closeIdx: 395, type: 'buy',  lots: 0.10, profit:  268.90 },
+    { openIdx: 402, closeIdx: 408, type: 'sell', lots: 0.10, profit:  125.40 },
+    { openIdx: 418, closeIdx: 424, type: 'buy',  lots: 0.10, profit:  -49.20 },
+    { openIdx: 435, closeIdx: 465, type: 'buy',  lots: 0.10, profit:  318.70 },
+  ];
+
+  trades = tradeData.map(td => {
+    if (td.openIdx >= candles.length || td.closeIdx >= candles.length) return null;
+    const oc = candles[td.openIdx];
+    const cc = candles[td.closeIdx];
+    const openPrice  = oc.c;
+    const pip = 0.10;
+    let closePrice;
+    if (td.type === 'buy') {
+      closePrice = td.profit >= 0
+        ? +(openPrice + Math.abs(td.profit) / 100 * pip * 10).toFixed(2)
+        : +(openPrice - Math.abs(td.profit) / 100 * pip * 10).toFixed(2);
+    } else {
+      closePrice = td.profit >= 0
+        ? +(openPrice - Math.abs(td.profit) / 100 * pip * 10).toFixed(2)
+        : +(openPrice + Math.abs(td.profit) / 100 * pip * 10).toFixed(2);
+    }
+    return {
+      openTime: oc.t, closeTime: cc.t,
+      type: td.type, lots: td.lots,
+      openPrice, closePrice, profit: td.profit
+    };
+  }).filter(Boolean);
+}
+
+function updateStats() {
+  const wins   = trades.filter(t => t.profit > 0);
+  const losses = trades.filter(t => t.profit <= 0);
+  const total  = trades.reduce((s, t) => s + t.profit, 0);
+  const wr     = (wins.length / trades.length * 100).toFixed(1);
+  const pf     = losses.length
+    ? (wins.reduce((s,t)=>s+t.profit,0) / Math.abs(losses.reduce((s,t)=>s+t.profit,0))).toFixed(2)
+    : '∞';
+  const avgW   = wins.length ? (wins.reduce((s,t)=>s+t.profit,0)/wins.length).toFixed(2) : '–';
+  const avgL   = losses.length ? (losses.reduce((s,t)=>s+t.profit,0)/losses.length).toFixed(2) : '–';
+  document.getElementById('statsPanel').innerHTML = `
+    <div class="stat-row"><span>取引数</span><span>${trades.length}件</span></div>
+    <div class="stat-row"><span>総損益</span><span class="${total>=0?'pos':'neg'}">${total>=0?'+':''}$${total.toFixed(2)}</span></div>
+    <div class="stat-row"><span>勝率</span><span class="pos">${wr}%</span></div>
+    <div class="stat-row"><span>勝 / 負</span><span><span class="pos">${wins.length}</span> / <span class="neg">${losses.length}</span></span></div>
+    <div class="stat-row"><span>PF</span><span class="pos">${pf}</span></div>
+    <div class="stat-row"><span>平均利益</span><span class="pos">+$${avgW}</span></div>
+    <div class="stat-row"><span>平均損失</span><span class="neg">$${avgL}</span></div>
+  `;
+}
+
+function updateTradeList() {
+  const el = document.getElementById('tradeList');
+  el.innerHTML = trades.map((tr, i) => {
+    const side = tr.type === 'buy' ? '<span style="color:#58a6ff">▲買</span>' : '<span style="color:#ffa657">▼売</span>';
+    const pnl  = tr.profit >= 0
+      ? `<span class="pos">+$${tr.profit.toFixed(0)}</span>`
+      : `<span class="neg">$${tr.profit.toFixed(0)}</span>`;
+    const d = tr.openTime;
+    const label = `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+    return `<div class="trade-item" id="ti${i}" onclick="jumpToTrade(${i})">${side} <span style="color:#8b949e">${label}</span> <span>${pnl}</span></div>`;
+  }).join('');
+}
+
+// ===== CANVAS =====
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const wrap = document.getElementById('chartWrap');
+  canvas.width  = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+}
+
+function resetView() {
+  candleW = Math.max(4, Math.min(14, canvas.width / Math.max(candles.length, 1)));
+  viewStart = Math.max(0, candles.length - Math.floor(canvas.width / candleW));
+}
+
+function visibleRange() {
+  const count = Math.floor((canvas.width - 65) / candleW);
+  const start = Math.max(0, Math.min(viewStart, candles.length - 1));
+  const end   = Math.min(candles.length, start + count);
+  return { start, end };
+}
+
+function priceRange(start, end) {
+  let lo = Infinity, hi = -Infinity;
+  for (let i = start; i < end; i++) {
+    if (candles[i].l < lo) lo = candles[i].l;
+    if (candles[i].h > hi) hi = candles[i].h;
+  }
+  const pad = (hi - lo) * 0.18;
+  return { lo: lo - pad, hi: hi + pad };
+}
+
+function niceStep(range, n) {
+  const r = range / n;
+  const mag = Math.pow(10, Math.floor(Math.log10(r)));
+  const norm = r / mag;
+  return (norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10) * mag;
+}
+
+function render() {
+  resizeCanvas();
+  const W = canvas.width, H = canvas.height;
+  const MARGIN_R = 65, MARGIN_B = 24;
+  const chartW = W - MARGIN_R, chartH = H - MARGIN_B;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!candles.length) return;
+
+  const { start, end } = visibleRange();
+  const { lo, hi } = priceRange(start, end);
+  const bodyW = candleW * (1 - GAP);
+
+  function toX(vi) { return vi * candleW + candleW * GAP / 2; }
+  function toY(p)  { return chartH - (p - lo) / (hi - lo) * chartH; }
+
+  // Grid
+  const step = niceStep(hi - lo, 6);
+  ctx.strokeStyle = '#1e2430'; ctx.lineWidth = 1;
+  ctx.fillStyle = '#8b949e'; ctx.font = '11px monospace'; ctx.textAlign = 'left';
+  for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) {
+    const y = toY(p);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
+    ctx.fillText(p.toFixed(2), chartW + 4, y + 4);
+  }
+
+  // Time axis
+  ctx.fillStyle = '#8b949e'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+  const labelEvery = Math.max(1, Math.round(80 / candleW));
+  for (let i = 0; i < end - start; i++) {
+    if (i % labelEvery !== 0) continue;
+    const c = candles[start + i];
+    const x = toX(i) + bodyW / 2;
+    const label = `${String(c.t.getMonth()+1).padStart(2,'0')}/${String(c.t.getDate()).padStart(2,'0')} ${String(c.t.getHours()).padStart(2,'0')}:${String(c.t.getMinutes()).padStart(2,'0')}`;
+    ctx.fillText(label, x, H - 6);
+  }
+
+  // Candles
+  for (let i = 0; i < end - start; i++) {
+    const c = candles[start + i];
+    const x = toX(i);
+    const bull = c.c >= c.o;
+    const col = bull ? '#3fb950' : '#f85149';
+    ctx.strokeStyle = col; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + bodyW/2, toY(c.h));
+    ctx.lineTo(x + bodyW/2, toY(c.l));
+    ctx.stroke();
+    ctx.fillStyle = bull ? '#3fb950' : '#f85149';
+    ctx.fillRect(x, toY(Math.max(c.o,c.c)), bodyW, Math.max(toY(Math.min(c.o,c.c)) - toY(Math.max(c.o,c.c)), 1));
+  }
+
+  // Trade markers
+  const markerSize = Math.max(10, Math.min(16, candleW * 1.6));
+  ctx.font = `bold ${markerSize}px sans-serif`;
+  ctx.textAlign = 'center';
+
+  for (const tr of trades) {
+    const ei = findCandle(tr.openTime, start, end);
+    const ci = findCandle(tr.closeTime, start, end);
+
+    if (ei >= 0) {
+      const x = toX(ei) + bodyW / 2;
+      const c = candles[start + ei];
+      if (tr.type === 'buy') {
+        ctx.fillStyle = '#58a6ff';
+        ctx.fillText('▲', x, toY(c.l) + markerSize + 2);
+      } else {
+        ctx.fillStyle = '#ffa657';
+        ctx.fillText('▼', x, toY(c.h) - 4);
+      }
+    }
+
+    if (ci >= 0) {
+      const x = toX(ci) + bodyW / 2;
+      const c = candles[start + ci];
+      if (tr.profit >= 0) {
+        ctx.fillStyle = '#3fb950';
+        ctx.fillText('✓', x, tr.type === 'buy' ? toY(c.h) - 4 : toY(c.l) + markerSize + 2);
+      } else {
+        ctx.fillStyle = '#f85149';
+        ctx.fillText('✗', x, tr.type === 'buy' ? toY(c.l) + markerSize + 2 : toY(c.h) - 4);
+      }
+    }
+  }
+
+  // Highlight active trade
+  if (currentTradeIdx >= 0 && currentTradeIdx < trades.length) {
+    const tr = trades[currentTradeIdx];
+    const ei = findCandle(tr.openTime, start, end);
+    const ci = findCandle(tr.closeTime, start, end);
+    if (ei >= 0 && ci >= 0) {
+      const x1 = toX(ei) + bodyW/2;
+      const x2 = toX(ci) + bodyW/2;
+      ctx.strokeStyle = tr.profit >= 0 ? 'rgba(63,185,80,0.3)' : 'rgba(248,81,73,0.3)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x1, toY(tr.openPrice));
+      ctx.lineTo(x2, toY(tr.closePrice));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  canvas._toY = toY; canvas._toX = toX;
+  canvas._lo = lo; canvas._hi = hi;
+  canvas._chartH = chartH;
+  canvas._start = start; canvas._end = end;
+  canvas._bodyW = bodyW;
+}
+
+function findCandle(t, start, end) {
+  if (!t) return -1;
+  const ms = t.getTime();
+  let best = -1, bestDiff = Infinity;
+  for (let i = start; i < end; i++) {
+    const d = Math.abs(candles[i].t.getTime() - ms);
+    if (d < bestDiff) { bestDiff = d; best = i - start; }
+  }
+  return best;
+}
+
+// ===== MOUSE =====
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const { start } = visibleRange();
+  const hoverIdx = start + Math.floor(e.offsetX / candleW);
+  const factor = e.deltaY < 0 ? 1.12 : 1/1.12;
+  candleW = Math.max(2, Math.min(50, candleW * factor));
+  viewStart = Math.max(0, hoverIdx - Math.floor(e.offsetX / candleW));
+  render();
+}, { passive: false });
+
+canvas.addEventListener('mousedown', e => { dragging = true; dragX0 = e.offsetX; dragView0 = viewStart; });
+canvas.addEventListener('mousemove', e => {
+  if (dragging) {
+    viewStart = Math.max(0, Math.floor(dragView0 + (dragX0 - e.offsetX) / candleW));
+    render();
+  }
+  showTooltip(e);
+});
+canvas.addEventListener('mouseup', () => dragging = false);
+canvas.addEventListener('mouseleave', () => {
+  dragging = false;
+  document.getElementById('tooltip').style.display = 'none';
+});
+
+function showTooltip(e) {
+  if (!candles.length || !canvas._start) return;
+  const { start, end } = visibleRange();
+  const vi = Math.floor(e.offsetX / candleW);
+  const idx = start + vi;
+  if (idx < 0 || idx >= end) return;
+  const c = candles[idx];
+  const bull = c.c >= c.o;
+
+  let tradeInfo = '';
+  for (const tr of trades) {
+    const ei = findCandle(tr.openTime, start, end);
+    const ci = findCandle(tr.closeTime, start, end);
+    if (ei === vi || ci === vi) {
+      const side = tr.type === 'buy' ? '買' : '売';
+      const result = tr.profit >= 0
+        ? `<span class="pos">+$${tr.profit.toFixed(2)}</span>`
+        : `<span class="neg">$${tr.profit.toFixed(2)}</span>`;
+      tradeInfo += `<br>${side} ${tr.lots}lot  ${tr.openPrice}→${tr.closePrice}  ${result}`;
+    }
+  }
+
+  const pad2 = n => String(n).padStart(2,'0');
+  const tstr = `${c.t.getFullYear()}.${pad2(c.t.getMonth()+1)}.${pad2(c.t.getDate())} ${pad2(c.t.getHours())}:${pad2(c.t.getMinutes())}`;
+  const tt = document.getElementById('tooltip');
+  tt.innerHTML = `<span style="color:#8b949e">${tstr}</span><br>
+O:<b style="color:#c9d1d9"> ${c.o.toFixed(2)}</b>
+H:<b style="color:#3fb950"> ${c.h.toFixed(2)}</b>
+L:<b style="color:#f85149"> ${c.l.toFixed(2)}</b>
+C:<b style="color:${bull?'#3fb950':'#f85149'}"> ${c.c.toFixed(2)}</b>${tradeInfo}`;
+
+  let tx = e.offsetX + 14, ty = e.offsetY - 10;
+  if (tx + 220 > canvas.width) tx = e.offsetX - 230;
+  tt.style.left = tx + 'px'; tt.style.top = ty + 'px'; tt.style.display = 'block';
+}
+
+// ===== NAVIGATION =====
+let currentTradeIdx = -1;
+
+function jumpToTrade(idx) {
+  if (!trades.length) return;
+  // Remove previous active
+  document.querySelectorAll('.trade-item').forEach(el => el.classList.remove('active'));
+  currentTradeIdx = Math.max(0, Math.min(trades.length - 1, idx));
+  const tr = trades[currentTradeIdx];
+  let best = 0, bestDiff = Infinity;
+  for (let i = 0; i < candles.length; i++) {
+    const d = Math.abs(candles[i].t.getTime() - tr.openTime.getTime());
+    if (d < bestDiff) { bestDiff = d; best = i; }
+  }
+  const visible = Math.floor((canvas.width - 65) / candleW);
+  const closeIdx = candles.findIndex(c => Math.abs(c.t - tr.closeTime) < 1000*60*15*2);
+  const endIdx = closeIdx >= 0 ? closeIdx : best;
+  const span = endIdx - best + 10;
+  // Fit the trade in view
+  candleW = Math.min(14, Math.max(4, (canvas.width - 65) / (span + 20)));
+  viewStart = Math.max(0, best - 10);
+
+  const pnl = tr.profit >= 0 ? `+$${tr.profit.toFixed(2)}` : `$${tr.profit.toFixed(2)}`;
+  const side = tr.type === 'buy' ? '▲買い' : '▼売り';
+  document.getElementById('tradeNav').textContent =
+    `${currentTradeIdx + 1} / ${trades.length}件  ${side}  ${pnl}`;
+
+  const ti = document.getElementById(`ti${currentTradeIdx}`);
+  if (ti) { ti.classList.add('active'); ti.scrollIntoView({ block: 'nearest' }); }
+  render();
+}
+
+document.getElementById('firstTrade').addEventListener('click', () => jumpToTrade(0));
+document.getElementById('prevTrade').addEventListener('click', () => jumpToTrade(currentTradeIdx - 1));
+document.getElementById('nextTrade').addEventListener('click', () => jumpToTrade(currentTradeIdx + 1));
+document.getElementById('lastTrade').addEventListener('click', () => jumpToTrade(trades.length - 1));
+
+window.addEventListener('resize', render);
+
+// ===== INIT =====
+generateSample();
+generateTrades();
+updateStats();
+updateTradeList();
+resizeCanvas();
+resetView();
+render();
+
+// Auto jump to first trade after short delay
+setTimeout(() => jumpToTrade(0), 300);
+</script>
+</body>
+</html>

@@ -97,6 +97,13 @@ textarea:focus { outline: none; border-color: #58a6ff; }
 .pos { color: #3fb950; }
 .neg { color: #f85149; }
 .hint { font-size: 11px; color: #8b949e; line-height: 1.9; }
+.trade-item {
+  padding: 3px 6px; border-radius: 4px; margin-bottom: 2px;
+  cursor: pointer; display: flex; justify-content: space-between;
+  border: 1px solid transparent;
+}
+.trade-item:hover { background: #21262d; border-color: #30363d; }
+.trade-item.active { background: #0d2a47; border-color: #58a6ff; }
 #tooltip {
   position: absolute;
   background: rgba(13,17,23,0.95);
@@ -129,7 +136,6 @@ textarea:focus { outline: none; border-color: #58a6ff; }
   <label class="filelabel" for="histFile">📂 口座履歴 / バックテストHTML</label>
   <input type="file" id="histFile" accept=".html,.htm">
   <button class="btn" id="sampleBtn">サンプル生成</button>
-  <button class="btn btn-gold" id="parseBtn">取引ログ反映</button>
   <button class="btn" id="firstTrade">|◀ 最初</button>
   <button class="btn" id="prevTrade">◀ 前の取引</button>
   <button class="btn" id="nextTrade">次の取引 ▶</button>
@@ -151,7 +157,7 @@ textarea:focus { outline: none; border-color: #58a6ff; }
   </div>
   <div id="sidebar">
     <div>
-      <div class="section-title">取引ログ貼付け</div>
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">取引ログ貼付け <button class="btn" id="parseBtn" style="font-size:11px;padding:2px 8px;">反映</button></div>
       <div class="hint" style="margin-bottom:6px">
         MT4バックテスト結果のCSVを貼り付けてください。<br>
         ヘッダー行は自動スキップします。
@@ -164,6 +170,13 @@ textarea:focus { outline: none; border-color: #58a6ff; }
     <div>
       <div class="section-title">統計</div>
       <div class="stats" id="statsPanel">
+        <div class="hint">取引ログを読み込むと表示されます</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">取引一覧</div>
+      <div id="tradeList" style="font-size:11px;max-height:200px;overflow-y:auto;">
         <div class="hint">取引ログを読み込むと表示されます</div>
       </div>
     </div>
@@ -245,6 +258,16 @@ function parseOHLC(text) {
   candles.sort((a, b) => a.t - b.t);
 }
 
+// ===== PARSE BUTTON =====
+document.getElementById('parseBtn').addEventListener('click', () => {
+  const csv = document.getElementById('tradeInput').value;
+  if (!csv.trim()) { status('取引ログが空です'); return; }
+  parseTrades(csv);
+  updateStats();
+  updateTradeList();
+  render();
+});
+
 // ===== SAMPLE DATA =====
 document.getElementById('sampleBtn').addEventListener('click', () => {
   generateSample();
@@ -283,6 +306,7 @@ document.getElementById('histFile').addEventListener('change', e => {
     const csvLines = csv.trim().split('\n').length - 1; // ヘッダー除く
     parseTrades(csv);
     updateStats();
+    updateTradeList();
     render();
     if (trades.length === 0) {
       status(`⚠ HTML解析: ${csvLines}行生成 → 取引0件`);
@@ -434,6 +458,25 @@ function parseTrades(text) {
     trades.push({ openTime, closeTime, type, lots: isNaN(lots) ? null : lots, openPrice, closePrice, profit });
   }
   status(`取引: ${trades.length}件読込`);
+}
+
+function updateTradeList() {
+  const el = document.getElementById('tradeList');
+  if (!trades.length) {
+    el.innerHTML = '<div class="hint">取引ログを読み込むと表示されます</div>';
+    return;
+  }
+  el.innerHTML = trades.map((tr, i) => {
+    const side = tr.type === 'buy'
+      ? '<span style="color:#58a6ff">▲買</span>'
+      : '<span style="color:#ffa657">▼売</span>';
+    const pnl = tr.profit >= 0
+      ? `<span style="color:#3fb950">+$${tr.profit.toFixed(0)}</span>`
+      : `<span style="color:#f85149">$${tr.profit.toFixed(0)}</span>`;
+    const d = tr.openTime;
+    const label = `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+    return `<div class="trade-item" id="ti${i}" onclick="jumpToTrade(${i})">${side} <span style="color:#8b949e">${label}</span> <span>${pnl}</span></div>`;
+  }).join('');
 }
 
 function updateStats() {
@@ -711,20 +754,21 @@ let currentTradeIdx = -1;
 
 function jumpToTrade(idx) {
   if (!trades.length) return;
+  document.querySelectorAll('.trade-item').forEach(el => el.classList.remove('active'));
   currentTradeIdx = Math.max(0, Math.min(trades.length - 1, idx));
   const tr = trades[currentTradeIdx];
   const t = tr.openTime;
-  // Find candle index for this trade
   let best = 0, bestDiff = Infinity;
   for (let i = 0; i < candles.length; i++) {
     const d = Math.abs(candles[i].t.getTime() - t.getTime());
     if (d < bestDiff) { bestDiff = d; best = i; }
   }
-  // Center the view on this candle
   const visible = Math.floor((canvas.width - 65) / candleW);
   viewStart = Math.max(0, best - Math.floor(visible / 2));
   document.getElementById('tradeNav').textContent =
     `${currentTradeIdx + 1} / ${trades.length}件  ${tr.type === 'buy' ? '▲買' : '▼売'}  ${tr.profit >= 0 ? '+' : ''}$${tr.profit.toFixed(2)}`;
+  const ti = document.getElementById(`ti${currentTradeIdx}`);
+  if (ti) { ti.classList.add('active'); ti.scrollIntoView({ block: 'nearest' }); }
   render();
 }
 
