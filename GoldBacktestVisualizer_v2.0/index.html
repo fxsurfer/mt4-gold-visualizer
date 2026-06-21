@@ -139,9 +139,6 @@ textarea:focus { outline: none; border-color: #58a6ff; }
   border-radius: 4px; padding: 2px 4px; font-size: 11px; width: 100%;
 }
 .ma-row input[type="color"] { width: 22px; height: 22px; border: none; border-radius: 3px; cursor: pointer; padding: 0; background: none; }
-.tf-group { display: flex; gap: 2px; }
-.btn-tf { padding: 4px 9px; font-size: 11px; }
-.btn-tf.active { background: #58a6ff; color: #000; border-color: #58a6ff; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -153,15 +150,6 @@ textarea:focus { outline: none; border-color: #58a6ff; }
   <label class="filelabel" for="histFile">📂 口座履歴 / バックテストHTML</label>
   <input type="file" id="histFile" accept=".html,.htm">
   <button class="btn" id="sampleBtn">サンプル生成</button>
-  <div class="tf-group">
-    <button class="btn btn-tf" data-tf="M1">M1</button>
-    <button class="btn btn-tf" data-tf="M5">M5</button>
-    <button class="btn btn-tf" data-tf="M15">M15</button>
-    <button class="btn btn-tf" data-tf="M30">M30</button>
-    <button class="btn btn-tf" data-tf="H1">H1</button>
-    <button class="btn btn-tf" data-tf="H4">H4</button>
-    <button class="btn btn-tf" data-tf="D1">D1</button>
-  </div>
   <button class="btn" id="firstTrade">|◀ 最初</button>
   <button class="btn" id="prevTrade">◀ 前の取引</button>
   <button class="btn" id="nextTrade">次の取引 ▶</button>
@@ -277,79 +265,12 @@ textarea:focus { outline: none; border-color: #58a6ff; }
 
 <script>
 // ===== STATE =====
-let rawCandles = [];  // 元データ（最小時間足）
-let candles = [];     // 現在表示中（集計後）
+let candles = [];
 let trades = [];
 let viewStart = 0;
 let candleW = 10;
 const GAP = 0.2;
 let dragging = false, dragX0 = 0, dragView0 = 0;
-let currentTF = null; // 現在の時間足
-
-// 時間足定義: name -> minutes
-const TF_MINUTES = { M1:1, M5:5, M15:15, M30:30, H1:60, H4:240, D1:1440 };
-
-function detectBaseTF() {
-  if (rawCandles.length < 2) return 'M1';
-  // 最小の時間差（分）を検出
-  let minDiff = Infinity;
-  for (let i = 1; i < Math.min(rawCandles.length, 50); i++) {
-    const diff = (rawCandles[i].t - rawCandles[i-1].t) / 60000;
-    if (diff > 0 && diff < minDiff) minDiff = diff;
-  }
-  for (const [name, mins] of Object.entries(TF_MINUTES)) {
-    if (Math.abs(minDiff - mins) < mins * 0.5) return name;
-  }
-  return 'M1';
-}
-
-function updateTFButtons(baseTF) {
-  const baseMins = TF_MINUTES[baseTF] || 1;
-  document.querySelectorAll('.btn-tf').forEach(btn => {
-    const tf = btn.dataset.tf;
-    const mins = TF_MINUTES[tf];
-    if (mins < baseMins) {
-      btn.disabled = true;
-      btn.style.opacity = '0.3';
-    } else {
-      btn.disabled = false;
-      btn.style.opacity = '1';
-    }
-    btn.classList.toggle('active', tf === currentTF);
-  });
-}
-
-function aggregateCandles(tf) {
-  if (tf === currentTF && rawCandles.length === candles.length && tf === detectBaseTF()) return;
-  const mins = TF_MINUTES[tf];
-  if (!mins) return;
-  const buckets = new Map();
-  for (const c of rawCandles) {
-    const ms = c.t.getTime();
-    const bucketMs = Math.floor(ms / (mins * 60000)) * (mins * 60000);
-    if (!buckets.has(bucketMs)) {
-      buckets.set(bucketMs, { t: new Date(bucketMs), o: c.o, h: c.h, l: c.l, c: c.c });
-    } else {
-      const b = buckets.get(bucketMs);
-      if (c.h > b.h) b.h = c.h;
-      if (c.l < b.l) b.l = c.l;
-      b.c = c.c;
-    }
-  }
-  candles = Array.from(buckets.values()).sort((a, b) => a.t - b.t);
-}
-
-function switchTF(tf) {
-  currentTF = tf;
-  aggregateCandles(tf);
-  updateTFButtons(detectBaseTF());
-  resetView();
-  render();
-}
-
-document.querySelectorAll('.btn-tf').forEach(btn => {
-  btn.addEventListener('click', () => switchTF(btn.dataset.tf));
-});
 
 // ===== OHLC FILE =====
 document.getElementById('ohlcFile').addEventListener('change', e => {
@@ -358,8 +279,7 @@ document.getElementById('ohlcFile').addEventListener('change', e => {
   const r = new FileReader();
   r.onload = ev => {
     parseOHLC(ev.target.result);
-    const baseTF = detectBaseTF();
-    status(`OHLC: ${rawCandles.length}本読込 (${baseTF})`);
+    status(`OHLC: ${candles.length}本読込`);
     resetView();
     render();
   };
@@ -367,20 +287,17 @@ document.getElementById('ohlcFile').addEventListener('change', e => {
 });
 
 function parseOHLC(text) {
-  rawCandles = [];
+  candles = [];
   for (const line of text.trim().split('\n')) {
     const c = line.trim().split(/[,\t]/);
     if (c.length < 6) continue;
+    // date,time,open,high,low,close[,vol]
     const dt = parseDateTime(c[0].trim() + ' ' + c[1].trim());
     const o = +c[2], h = +c[3], l = +c[4], cl = +c[5];
     if (!dt || isNaN(o) || isNaN(cl)) continue;
-    rawCandles.push({ t: dt, o, h, l, c: cl });
+    candles.push({ t: dt, o, h, l, c: cl });
   }
-  rawCandles.sort((a, b) => a.t - b.t);
-  const baseTF = detectBaseTF();
-  currentTF = baseTF;
-  candles = [...rawCandles];
-  updateTFButtons(baseTF);
+  candles.sort((a, b) => a.t - b.t);
 }
 
 // ===== PARSE BUTTON =====
@@ -396,33 +313,28 @@ document.getElementById('parseBtn').addEventListener('click', () => {
 // ===== SAMPLE DATA =====
 document.getElementById('sampleBtn').addEventListener('click', () => {
   generateSample();
-  status(`サンプルデータ: ${rawCandles.length}本 (M1)`);
+  status(`サンプルデータ: ${candles.length}本`);
   resetView();
   render();
 });
 
 function generateSample() {
-  rawCandles = [];
-  // M1ベースで生成（3000本）
+  candles = [];
+  // Generate ~2000 M15 candles starting 2024-01-01
   let price = 2050;
-  const dt = new Date(2024, 0, 2, 8, 0, 0);
-  for (let i = 0; i < 3000; i++) {
-    while (dt.getDay() === 0 || dt.getDay() === 6 ||
-           dt.getHours() < 1 || dt.getHours() >= 23) {
-      dt.setMinutes(dt.getMinutes() + 1);
-    }
+  const dt = new Date(2024, 0, 1, 8, 0, 0);
+  for (let i = 0; i < 2000; i++) {
+    // Skip weekends
+    while (dt.getDay() === 0 || dt.getDay() === 6) dt.setMinutes(dt.getMinutes() + 15);
     const open = price;
-    const move = (Math.random() - 0.49) * 2;
+    const move = (Math.random() - 0.48) * 8;
     const close = open + move;
-    const high = Math.max(open, close) + Math.random() * 1.5;
-    const low  = Math.min(open, close) - Math.random() * 1.5;
-    rawCandles.push({ t: new Date(dt), o: +open.toFixed(2), h: +high.toFixed(2), l: +low.toFixed(2), c: +close.toFixed(2) });
+    const high = Math.max(open, close) + Math.random() * 5;
+    const low = Math.min(open, close) - Math.random() * 5;
+    candles.push({ t: new Date(dt), o: +open.toFixed(2), h: +high.toFixed(2), l: +low.toFixed(2), c: +close.toFixed(2) });
     price = close;
-    dt.setMinutes(dt.getMinutes() + 1);
+    dt.setMinutes(dt.getMinutes() + 15);
   }
-  currentTF = 'M1';
-  candles = [...rawCandles];
-  updateTFButtons('M1');
 }
 
 // ===== MT4 HTML HISTORY FILE =====
