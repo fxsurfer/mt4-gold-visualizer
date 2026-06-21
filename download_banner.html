@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>バナー変換</title></head>
+<body style="background:#222;color:#fff;font-family:sans-serif;text-align:center;padding:40px;">
+<h2>アフィリエイトバナー変換中...</h2>
+<p>自動でJPGがダウンロードされます</p>
+<canvas id="c" width="468" height="60" style="border:1px solid #555;margin-top:20px;"></canvas>
+<br><br>
+<button onclick="download()" style="padding:12px 32px;font-size:16px;background:#ef9f27;border:none;border-radius:6px;cursor:pointer;color:#000;font-weight:bold;">もう一度ダウンロード</button>
+
+<script>
+const svgStr = `<svg viewBox="0 0 468 60" xmlns="http://www.w3.org/2000/svg" width="468" height="60">
+  <rect width="468" height="60" fill="#0f1117"/>
+  <rect x="0" y="0" width="4" height="60" fill="#ef9f27"/>
+
+  <!-- Mini candles -->
+  <line x1="18" y1="12" x2="18" y2="48" stroke="#e24b4a" stroke-width="1"/>
+  <rect x="14" y="20" width="8" height="22" fill="#e24b4a"/>
+  <line x1="32" y1="10" x2="32" y2="44" stroke="#1d9e75" stroke-width="1"/>
+  <rect x="28" y="16" width="8" height="22" fill="#1d9e75"/>
+  <line x1="46" y1="14" x2="46" y2="46" stroke="#1d9e75" stroke-width="1"/>
+  <rect x="42" y="20" width="8" height="18" fill="#1d9e75"/>
+  <line x1="60" y1="8" x2="60" y2="40" stroke="#1d9e75" stroke-width="1"/>
+  <rect x="56" y="14" width="8" height="20" fill="#1d9e75"/>
+  <line x1="74" y1="12" x2="74" y2="42" stroke="#e24b4a" stroke-width="1"/>
+  <rect x="70" y="18" width="8" height="18" fill="#e24b4a"/>
+
+  <!-- entry/exit markers -->
+  <polygon points="32,48 28,56 36,56" fill="#378add"/>
+  <text x="26" y="12" fill="#1d9e75" font-size="10" font-family="Arial" font-weight="bold">✓</text>
+  <text x="68" y="44" fill="#e24b4a" font-size="10" font-family="Arial" font-weight="bold">✗</text>
+
+  <!-- Divider -->
+  <line x1="96" y1="8" x2="96" y2="52" stroke="#2a2a4a" stroke-width="1"/>
+
+  <!-- Main text -->
+  <text x="108" y="26" fill="#ffffff" font-size="15" font-family="sans-serif" font-weight="bold">MT4バックテスト可視化ツール</text>
+  <text x="108" y="44" fill="#aaaacc" font-size="11" font-family="sans-serif">取引履歴をローソク足チャートに重ねて分析</text>
+
+  <!-- Right badge -->
+  <rect x="348" y="10" width="110" height="40" rx="4" fill="#1a1a2e" stroke="#ef9f27" stroke-width="1"/>
+  <text x="403" y="27" fill="#ef9f27" font-size="11" font-family="sans-serif" font-weight="bold" text-anchor="middle">GOLD対応</text>
+  <text x="403" y="43" fill="#ffffff" font-size="13" font-family="monospace" font-weight="bold" text-anchor="middle">¥4,980</text>
+</svg>`;
+
+function download() {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  const blob = new Blob([svgStr], {type: 'image/svg+xml'});
+  const url = URL.createObjectURL(blob);
+  img.onload = function() {
+    ctx.fillStyle = '#0f1117';
+    ctx.fillRect(0, 0, 468, 60);
+    ctx.drawImage(img, 0, 0, 468, 60);
+    URL.revokeObjectURL(url);
+    const a = document.createElement('a');
+    a.download = 'gogojungle_banner.jpg';
+    a.href = canvas.toDataURL('image/jpeg', 0.95);
+    a.click();
+    document.querySelector('h2').textContent = 'ダウンロード完了！';
+    document.querySelector('p').textContent = 'gogojungle_banner.jpg をアフィリエイト用バナーにアップしてください';
+  };
+  img.src = url;
+}
+
+window.onload = download;
+</script>
+</body>
+</html>

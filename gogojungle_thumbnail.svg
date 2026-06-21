@@ -1,0 +1,104 @@
+<svg viewBox="0 0 820 460" xmlns="http://www.w3.org/2000/svg" width="820" height="460">
+  <!-- Background -->
+  <rect width="820" height="460" fill="#0f1117"/>
+
+  <!-- Left panel: chart area -->
+  <rect x="30" y="30" width="490" height="400" rx="8" fill="#1a1a2e" stroke="#2a2a4a" stroke-width="1"/>
+
+  <!-- Grid lines -->
+  <line x1="30" y1="110" x2="520" y2="110" stroke="#2a2a4a" stroke-width="0.5"/>
+  <line x1="30" y1="190" x2="520" y2="190" stroke="#2a2a4a" stroke-width="0.5"/>
+  <line x1="30" y1="270" x2="520" y2="270" stroke="#2a2a4a" stroke-width="0.5"/>
+  <line x1="30" y1="350" x2="520" y2="350" stroke="#2a2a4a" stroke-width="0.5"/>
+
+  <!-- Price labels -->
+  <text x="530" y="114" fill="#555577" font-size="11" font-family="monospace">3420</text>
+  <text x="530" y="194" fill="#555577" font-size="11" font-family="monospace">3380</text>
+  <text x="530" y="274" fill="#555577" font-size="11" font-family="monospace">3340</text>
+  <text x="530" y="354" fill="#555577" font-size="11" font-family="monospace">3300</text>
+
+  <!-- Candles -->
+  <line x1="65" y1="145" x2="65" y2="295" stroke="#e24b4a" stroke-width="1"/>
+  <rect x="58" y="175" width="14" height="90" fill="#e24b4a" rx="1"/>
+  <line x1="95" y1="140" x2="95" y2="290" stroke="#1d9e75" stroke-width="1"/>
+  <rect x="88" y="155" width="14" height="110" fill="#1d9e75" rx="1"/>
+  <line x1="125" y1="130" x2="125" y2="270" stroke="#e24b4a" stroke-width="1"/>
+  <rect x="118" y="155" width="14" height="80" fill="#e24b4a" rx="1"/>
+  <line x1="155" y1="125" x2="155" y2="255" stroke="#1d9e75" stroke-width="1"/>
+  <rect x="148" y="140" width="14" height="90" fill="#1d9e75" rx="1"/>
+  <line x1="185" y1="115" x2="185" y2="235" stroke="#1d9e75" stroke-width="1"/>
+  <rect x="178" y="130" width="14" height="80" fill="#1d9e75" rx="1"/>
+  <line x1="215" y1="130" x2="215" y2="260" stroke="#e24b4a" stroke-width="1"/>
+  <rect x="208" y="145" width="14" height="85" fill="#e24b4a" rx="1"/>
+  <line x1="245" y1="100" x2="245" y2="230" stroke="#1d9e75" stroke-width="1"/>
+  <rect x="238" y="115" width="14" height="100" fill="#1d9e75" rx="1"/>
+  <line x1="275" y1="95" x2="275" y2="210" stroke="#1d9e75" stroke-width="1"/>
+  <rect x="268" y="105" width="14" height="90" fill="#1d9e75" rx="1"/>
+  <line x1="305" y1="105" x2="305" y2="225" stroke="#e24b4a" stroke-width="1"/>
+  <rect x="298" y="118" width="14" height="80" fill="#e24b4a" rx="1"/>
+  <line x1="335" y1="90" x2="335" y2="200" stroke="#1d9e75" stroke-width="1"/>
+  <rect x="328" y="100" width="14" height="80" fill="#1d9e75" rx="1"/>
+  <line x1="365" y1="100" x2="365" y2="220" stroke="#e24b4a" stroke-width="1"/>
+  <rect x="358" y="115" width="14" height="75" fill="#e24b4a" rx="1"/>
+  <line x1="395" y1="110" x2="395" y2="250" stroke="#e24b4a" stroke-width="1"/>
+  <rect x="388" y="135" width="14" height="90" fill="#e24b4a" rx="1"/>
+  <line x1="425" y1="105" x2="425" y2="225" stroke="#1d9e75" stroke-width="1"/>
+  <rect x="418" y="115" width="14" height="90" fill="#1d9e75" rx="1"/>
+  <line x1="455" y1="95" x2="455" y2="205" stroke="#1d9e75" stroke-width="1"/>
+  <rect x="448" y="108" width="14" height="80" fill="#1d9e75" rx="1"/>
+  <line x1="485" y1="100" x2="485" y2="215" stroke="#e24b4a" stroke-width="1"/>
+  <rect x="478" y="115" width="14" height="70" fill="#e24b4a" rx="1"/>
+
+  <!-- BUY entry markers (blue triangle up) -->
+  <polygon points="95,302 88,318 102,318" fill="#378add"/>
+  <polygon points="245,242 238,258 252,258" fill="#378add"/>
+  <polygon points="335,212 328,228 342,228" fill="#378add"/>
+
+  <!-- SELL entry markers (orange triangle down) -->
+  <polygon points="155,118 148,102 162,102" fill="#ef9f27"/>
+  <polygon points="395,102 388,86 402,86" fill="#ef9f27"/>
+
+  <!-- WIN marks -->
+  <text x="80" y="145" fill="#1d9e75" font-size="16" font-family="Arial" font-weight="bold">&#x2713;</text>
+  <text x="230" y="100" fill="#1d9e75" font-size="16" font-family="Arial" font-weight="bold">&#x2713;</text>
+  <text x="440" y="98" fill="#1d9e75" font-size="16" font-family="Arial" font-weight="bold">&#x2713;</text>
+
+  <!-- LOSS marks -->
+  <text x="140" y="265" fill="#e24b4a" font-size="16" font-family="Arial" font-weight="bold">&#x2717;</text>
+  <text x="320" y="88" fill="#e24b4a" font-size="16" font-family="Arial" font-weight="bold">&#x2717;</text>
+
+  <!-- Chart title bar -->
+  <rect x="30" y="30" width="490" height="36" rx="8" fill="#16213e"/>
+  <rect x="30" y="50" width="490" height="16" fill="#16213e"/>
+  <text x="48" y="52" fill="#aaaacc" font-size="12" font-family="monospace">GOLD / M15　2024.01 - 2026.06</text>
+  <text x="400" y="52" fill="#aaaacc" font-size="11" font-family="monospace">&#x25B2;&#x25BC; &#x2713;&#x2717;</text>
+
+  <!-- Right panel: Stats box -->
+  <rect x="560" y="30" width="230" height="190" rx="8" fill="#1a1a2e" stroke="#2a2a4a" stroke-width="1"/>
+  <text x="578" y="58" fill="#888899" font-size="11" font-family="sans-serif">&#x53d6;&#x5f15;&#x6570;</text>
+  <text x="578" y="78" fill="#ffffff" font-size="22" font-family="monospace" font-weight="bold">371</text>
+  <line x1="575" y1="90" x2="775" y2="90" stroke="#2a2a4a" stroke-width="0.5"/>
+  <text x="578" y="108" fill="#888899" font-size="11" font-family="sans-serif">&#x52dd;&#x7387;</text>
+  <text x="578" y="128" fill="#1d9e75" font-size="22" font-family="monospace" font-weight="bold">70.9%</text>
+  <line x1="575" y1="140" x2="775" y2="140" stroke="#2a2a4a" stroke-width="0.5"/>
+  <text x="578" y="158" fill="#888899" font-size="11" font-family="sans-serif">&#x7dcf;&#x640d;&#x76ca;</text>
+  <text x="578" y="178" fill="#1d9e75" font-size="20" font-family="monospace" font-weight="bold">+$6,406</text>
+  <line x1="575" y1="190" x2="775" y2="190" stroke="#2a2a4a" stroke-width="0.5"/>
+  <text x="578" y="208" fill="#888899" font-size="11" font-family="sans-serif">PF</text>
+  <text x="618" y="208" fill="#ffffff" font-size="18" font-family="monospace" font-weight="bold">1.21</text>
+
+  <!-- Feature badges -->
+  <rect x="560" y="238" width="230" height="36" rx="6" fill="#0f2a1a" stroke="#1d9e75" stroke-width="1"/>
+  <text x="575" y="261" fill="#1d9e75" font-size="13" font-family="sans-serif">&#x2713; HTML&#x8aad;&#x307f;&#x8fbc;&#x307f;&#x5bfe;&#x5fdc;</text>
+  <rect x="560" y="282" width="230" height="36" rx="6" fill="#0a1f35" stroke="#378add" stroke-width="1"/>
+  <text x="575" y="305" fill="#378add" font-size="13" font-family="sans-serif">&#x25B2;&#x25BC; &#x5168;&#x53d6;&#x5f15;&#x30c1;&#x30e3;&#x30fc;&#x30c8;&#x8868;&#x793a;</text>
+  <rect x="560" y="326" width="230" height="36" rx="6" fill="#2a1a0a" stroke="#ef9f27" stroke-width="1"/>
+  <text x="575" y="349" fill="#ef9f27" font-size="13" font-family="sans-serif">&#x25c4;&#x25ba; &#x30c8;&#x30ec;&#x30fc;&#x30c9;&#x30ca;&#x30d3;&#x30b2;&#x30fc;&#x30b7;&#x30e7;&#x30f3;</text>
+  <rect x="560" y="370" width="230" height="36" rx="6" fill="#1a1a2e" stroke="#555577" stroke-width="1"/>
+  <text x="575" y="393" fill="#aaaacc" font-size="13" font-family="sans-serif">&#x26A1; &#x30a4;&#x30f3;&#x30b9;&#x30c8;&#x30fc;&#x30eb;&#x4e0d;&#x8981;</text>
+
+  <!-- Bottom title -->
+  <text x="50" y="432" fill="#ffffff" font-size="20" font-family="sans-serif" font-weight="bold">MT4&#x30d0;&#x30c3;&#x30af;&#x30c6;&#x30b9;&#x30c8;</text>
+  <text x="248" y="432" fill="#ef9f27" font-size="20" font-family="sans-serif" font-weight="bold">&#x53ef;&#x8996;&#x5316;&#x30c4;&#x30fc;&#x30eb;</text>
+  <text x="50" y="453" fill="#888899" font-size="13" font-family="sans-serif">&#x53d6;&#x5f15;&#x5c65;&#x6b74;&#x3092;&#x30ed;&#x30fc;&#x30bd;&#x30af;&#x8db3;&#x30c1;&#x30e3;&#x30fc;&#x30c8;&#x306b;&#x91cd;&#x306d;&#x3066;&#x5206;&#x6790;&#x3000;&#x30b4;&#x30fc;&#x30eb;&#x30c9;&#x5bfe;&#x5fdc;</text>
+</svg>

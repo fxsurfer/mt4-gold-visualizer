@@ -125,20 +125,6 @@ textarea:focus { outline: none; border-color: #58a6ff; }
   flex-wrap: wrap;
 }
 .legend span { display: flex; align-items: center; gap: 3px; }
-.ma-row {
-  display: grid;
-  grid-template-columns: 16px 52px 44px 1fr 22px;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 5px;
-  font-size: 11px;
-}
-.ma-row input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: #58a6ff; }
-.ma-row select, .ma-row input[type="number"] {
-  background: #0d1117; border: 1px solid #30363d; color: #c9d1d9;
-  border-radius: 4px; padding: 2px 4px; font-size: 11px; width: 100%;
-}
-.ma-row input[type="color"] { width: 22px; height: 22px; border: none; border-radius: 3px; cursor: pointer; padding: 0; background: none; }
 </style>
 </head>
 <body>
@@ -150,17 +136,6 @@ textarea:focus { outline: none; border-color: #58a6ff; }
   <label class="filelabel" for="histFile">📂 口座履歴 / バックテストHTML</label>
   <input type="file" id="histFile" accept=".html,.htm">
   <button class="btn" id="sampleBtn">サンプル生成</button>
-  <select id="tfSelect" class="btn" style="padding:5px 8px;cursor:pointer;">
-    <option value="M1">M1</option>
-    <option value="M5">M5</option>
-    <option value="M15">M15</option>
-    <option value="M30">M30</option>
-    <option value="H1">H1</option>
-    <option value="H4">H4</option>
-    <option value="D1">D1</option>
-    <option value="W1">W1</option>
-    <option value="MN">MN</option>
-  </select>
   <button class="btn" id="firstTrade">|◀ 最初</button>
   <button class="btn" id="prevTrade">◀ 前の取引</button>
   <button class="btn" id="nextTrade">次の取引 ▶</button>
@@ -207,34 +182,6 @@ textarea:focus { outline: none; border-color: #58a6ff; }
     </div>
 
     <div>
-      <div class="section-title">移動平均線</div>
-      <div style="font-size:10px;color:#8b949e;margin-bottom:6px;display:grid;grid-template-columns:16px 52px 44px 1fr 22px;gap:4px;">
-        <span></span><span>種類</span><span>期間</span><span style="padding-left:2px">色</span><span></span>
-      </div>
-      <div class="ma-row">
-        <input type="checkbox" id="ma1en" checked>
-        <select id="ma1type"><option value="EMA">EMA</option><option value="SMA">SMA</option></select>
-        <input type="number" id="ma1per" value="21" min="1" max="999">
-        <input type="color" id="ma1col" value="#f0b429">
-        <span style="font-size:10px;color:#8b949e">MA1</span>
-      </div>
-      <div class="ma-row">
-        <input type="checkbox" id="ma2en" checked>
-        <select id="ma2type"><option value="EMA">EMA</option><option value="SMA">SMA</option></select>
-        <input type="number" id="ma2per" value="75" min="1" max="999">
-        <input type="color" id="ma2col" value="#a78bfa">
-        <span style="font-size:10px;color:#8b949e">MA2</span>
-      </div>
-      <div class="ma-row">
-        <input type="checkbox" id="ma3en">
-        <select id="ma3type"><option value="EMA">EMA</option><option value="SMA">SMA</option></select>
-        <input type="number" id="ma3per" value="200" min="1" max="999">
-        <input type="color" id="ma3col" value="#38bdf8">
-        <span style="font-size:10px;color:#8b949e">MA3</span>
-      </div>
-    </div>
-
-    <div>
       <div class="section-title">操作方法</div>
       <div class="hint">
         🖱 ホイール → ズームイン/アウト<br>
@@ -276,70 +223,12 @@ textarea:focus { outline: none; border-color: #58a6ff; }
 
 <script>
 // ===== STATE =====
-let rawCandles = [];  // 元データ（最小時間足）
-let candles = [];     // 現在表示中（集計後）
+let candles = [];
 let trades = [];
 let viewStart = 0;
 let candleW = 10;
 const GAP = 0.2;
 let dragging = false, dragX0 = 0, dragView0 = 0;
-let currentTF = null; // 現在の時間足
-
-// 時間足定義: name -> minutes
-const TF_MINUTES = { M1:1, M5:5, M15:15, M30:30, H1:60, H4:240, D1:1440, W1:10080, MN:43200 };
-
-function detectBaseTF() {
-  if (rawCandles.length < 2) return 'M1';
-  // 最小の時間差（分）を検出
-  let minDiff = Infinity;
-  for (let i = 1; i < Math.min(rawCandles.length, 50); i++) {
-    const diff = (rawCandles[i].t - rawCandles[i-1].t) / 60000;
-    if (diff > 0 && diff < minDiff) minDiff = diff;
-  }
-  for (const [name, mins] of Object.entries(TF_MINUTES)) {
-    if (Math.abs(minDiff - mins) < mins * 0.5) return name;
-  }
-  return 'M1';
-}
-
-function updateTFButtons(baseTF) {
-  const baseMins = TF_MINUTES[baseTF] || 1;
-  const sel = document.getElementById('tfSelect');
-  Array.from(sel.options).forEach(opt => {
-    opt.disabled = (TF_MINUTES[opt.value] || 0) < baseMins;
-  });
-  sel.value = currentTF;
-}
-
-function aggregateCandles(tf) {
-  if (tf === currentTF && rawCandles.length === candles.length && tf === detectBaseTF()) return;
-  const mins = TF_MINUTES[tf];
-  if (!mins) return;
-  const buckets = new Map();
-  for (const c of rawCandles) {
-    const ms = c.t.getTime();
-    const bucketMs = Math.floor(ms / (mins * 60000)) * (mins * 60000);
-    if (!buckets.has(bucketMs)) {
-      buckets.set(bucketMs, { t: new Date(bucketMs), o: c.o, h: c.h, l: c.l, c: c.c });
-    } else {
-      const b = buckets.get(bucketMs);
-      if (c.h > b.h) b.h = c.h;
-      if (c.l < b.l) b.l = c.l;
-      b.c = c.c;
-    }
-  }
-  candles = Array.from(buckets.values()).sort((a, b) => a.t - b.t);
-}
-
-function switchTF(tf) {
-  currentTF = tf;
-  aggregateCandles(tf);
-  updateTFButtons(detectBaseTF());
-  resetView();
-  render();
-}
-
-document.getElementById('tfSelect').addEventListener('change', e => switchTF(e.target.value));
 
 // ===== OHLC FILE =====
 document.getElementById('ohlcFile').addEventListener('change', e => {
@@ -348,8 +237,7 @@ document.getElementById('ohlcFile').addEventListener('change', e => {
   const r = new FileReader();
   r.onload = ev => {
     parseOHLC(ev.target.result);
-    const baseTF = detectBaseTF();
-    status(`OHLC: ${rawCandles.length}本読込 (${baseTF})`);
+    status(`OHLC: ${candles.length}本読込`);
     resetView();
     render();
   };
@@ -357,20 +245,17 @@ document.getElementById('ohlcFile').addEventListener('change', e => {
 });
 
 function parseOHLC(text) {
-  rawCandles = [];
+  candles = [];
   for (const line of text.trim().split('\n')) {
     const c = line.trim().split(/[,\t]/);
     if (c.length < 6) continue;
+    // date,time,open,high,low,close[,vol]
     const dt = parseDateTime(c[0].trim() + ' ' + c[1].trim());
     const o = +c[2], h = +c[3], l = +c[4], cl = +c[5];
     if (!dt || isNaN(o) || isNaN(cl)) continue;
-    rawCandles.push({ t: dt, o, h, l, c: cl });
+    candles.push({ t: dt, o, h, l, c: cl });
   }
-  rawCandles.sort((a, b) => a.t - b.t);
-  const baseTF = detectBaseTF();
-  currentTF = baseTF;
-  candles = [...rawCandles];
-  updateTFButtons(baseTF);
+  candles.sort((a, b) => a.t - b.t);
 }
 
 // ===== PARSE BUTTON =====
@@ -386,33 +271,28 @@ document.getElementById('parseBtn').addEventListener('click', () => {
 // ===== SAMPLE DATA =====
 document.getElementById('sampleBtn').addEventListener('click', () => {
   generateSample();
-  status(`サンプルデータ: ${rawCandles.length}本 (M1)`);
+  status(`サンプルデータ: ${candles.length}本`);
   resetView();
   render();
 });
 
 function generateSample() {
-  rawCandles = [];
-  // M1ベースで生成（3000本）
+  candles = [];
+  // Generate ~2000 M15 candles starting 2024-01-01
   let price = 2050;
-  const dt = new Date(2024, 0, 2, 8, 0, 0);
-  for (let i = 0; i < 3000; i++) {
-    while (dt.getDay() === 0 || dt.getDay() === 6 ||
-           dt.getHours() < 1 || dt.getHours() >= 23) {
-      dt.setMinutes(dt.getMinutes() + 1);
-    }
+  const dt = new Date(2024, 0, 1, 8, 0, 0);
+  for (let i = 0; i < 2000; i++) {
+    // Skip weekends
+    while (dt.getDay() === 0 || dt.getDay() === 6) dt.setMinutes(dt.getMinutes() + 15);
     const open = price;
-    const move = (Math.random() - 0.49) * 2;
+    const move = (Math.random() - 0.48) * 8;
     const close = open + move;
-    const high = Math.max(open, close) + Math.random() * 1.5;
-    const low  = Math.min(open, close) - Math.random() * 1.5;
-    rawCandles.push({ t: new Date(dt), o: +open.toFixed(2), h: +high.toFixed(2), l: +low.toFixed(2), c: +close.toFixed(2) });
+    const high = Math.max(open, close) + Math.random() * 5;
+    const low = Math.min(open, close) - Math.random() * 5;
+    candles.push({ t: new Date(dt), o: +open.toFixed(2), h: +high.toFixed(2), l: +low.toFixed(2), c: +close.toFixed(2) });
     price = close;
-    dt.setMinutes(dt.getMinutes() + 1);
+    dt.setMinutes(dt.getMinutes() + 15);
   }
-  currentTF = 'M1';
-  candles = [...rawCandles];
-  updateTFButtons('M1');
 }
 
 // ===== MT4 HTML HISTORY FILE =====
@@ -617,62 +497,6 @@ function updateStats() {
   `;
 }
 
-// ===== MOVING AVERAGES =====
-function calcMA(type, period) {
-  const result = new Array(candles.length).fill(null);
-  if (period < 1 || candles.length < period) return result;
-  if (type === 'SMA') {
-    let sum = 0;
-    for (let i = 0; i < candles.length; i++) {
-      sum += candles[i].c;
-      if (i >= period) sum -= candles[i - period].c;
-      if (i >= period - 1) result[i] = sum / period;
-    }
-  } else { // EMA
-    const k = 2 / (period + 1);
-    let ema = candles[period - 1].c;
-    result[period - 1] = ema;
-    for (let i = period; i < candles.length; i++) {
-      ema = candles[i].c * k + ema * (1 - k);
-      result[i] = ema;
-    }
-  }
-  return result;
-}
-
-function getMAConfigs() {
-  return [1, 2, 3].map(n => ({
-    enabled: document.getElementById(`ma${n}en`).checked,
-    type:    document.getElementById(`ma${n}type`).value,
-    period:  parseInt(document.getElementById(`ma${n}per`).value) || 0,
-    color:   document.getElementById(`ma${n}col`).value,
-  }));
-}
-
-function drawMAs(toX, toY, bodyW, start, end) {
-  const configs = getMAConfigs();
-  for (const cfg of configs) {
-    if (!cfg.enabled || cfg.period < 1) continue;
-    const vals = calcMA(cfg.type, cfg.period);
-    ctx.strokeStyle = cfg.color;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    let started = false;
-    for (let i = start; i < end; i++) {
-      if (vals[i] == null) continue;
-      const x = toX(i - start) + bodyW / 2;
-      const y = toY(vals[i]);
-      if (!started) { ctx.moveTo(x, y); started = true; }
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-  }
-}
-
-// MA設定変更で即再描画
-['ma1en','ma2en','ma3en','ma1type','ma2type','ma3type','ma1per','ma2per','ma3per','ma1col','ma2col','ma3col']
-  .forEach(id => document.getElementById(id).addEventListener('change', render));
-
 // ===== DATE PARSE =====
 function parseDateTime(s) {
   // スペース・非改行スペース・制御文字を除去してから数字と区切り文字だけ残す
@@ -785,9 +609,6 @@ function render() {
     ctx.fillStyle = bull ? '#3fb950' : '#f85149';
     ctx.fillRect(x, y1, bodyW, Math.max(y2 - y1, 1));
   }
-
-  // --- Moving averages ---
-  drawMAs(toX, toY, bodyW, start, end);
 
   // --- Trade markers ---
   ctx.font = `bold ${Math.max(10, Math.min(14, candleW * 1.4))}px sans-serif`;
