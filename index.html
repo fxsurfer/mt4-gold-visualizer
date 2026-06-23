@@ -207,6 +207,32 @@ textarea:focus { outline: none; border-color: #58a6ff; }
     </div>
 
     <div>
+      <div class="section-title">ZigZag</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <input type="checkbox" id="zzEn" checked style="width:14px;height:14px;cursor:pointer;accent-color:#58a6ff;">
+        <span style="font-size:11px;color:#8b949e;">有効</span>
+        <input type="color" id="zzCol" value="#00e5ff" style="width:22px;height:22px;border:none;border-radius:3px;cursor:pointer;padding:0;background:none;margin-left:auto;">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;font-size:11px;">
+        <div>
+          <div style="color:#8b949e;margin-bottom:2px;">Depth</div>
+          <input type="number" id="zzDepth" value="12" min="1" max="100"
+            style="width:100%;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:4px;padding:2px 4px;font-size:11px;">
+        </div>
+        <div>
+          <div style="color:#8b949e;margin-bottom:2px;">Deviation$</div>
+          <input type="number" id="zzDev" value="3" min="0.1" max="500" step="0.1"
+            style="width:100%;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:4px;padding:2px 4px;font-size:11px;">
+        </div>
+        <div>
+          <div style="color:#8b949e;margin-bottom:2px;">Backstep</div>
+          <input type="number" id="zzBack" value="3" min="1" max="20"
+            style="width:100%;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:4px;padding:2px 4px;font-size:11px;">
+        </div>
+      </div>
+    </div>
+
+    <div>
       <div class="section-title">移動平均線</div>
       <div style="font-size:10px;color:#8b949e;margin-bottom:6px;display:grid;grid-template-columns:16px 52px 44px 1fr 22px;gap:4px;">
         <span></span><span>種類</span><span>期間</span><span style="padding-left:2px">色</span><span></span>
@@ -386,10 +412,43 @@ document.getElementById('parseBtn').addEventListener('click', () => {
 // ===== SAMPLE DATA =====
 document.getElementById('sampleBtn').addEventListener('click', () => {
   generateSample();
-  status(`サンプルデータ: ${rawCandles.length}本 (M1)`);
+  generateSampleTrades();
+  updateStats();
+  updateTradeList();
+  status(`サンプルデータ: ${rawCandles.length}本 (M1) / 取引: ${trades.length}件`);
   resetView();
   render();
 });
+
+function generateSampleTrades() {
+  const tradeData = [
+    { openIdx:  20, closeIdx:  45, type: 'buy',  lots: 0.10, profit:  132.50 },
+    { openIdx:  60, closeIdx:  68, type: 'buy',  lots: 0.10, profit:  -48.00 },
+    { openIdx:  90, closeIdx: 130, type: 'buy',  lots: 0.10, profit:  215.30 },
+    { openIdx: 145, closeIdx: 158, type: 'sell', lots: 0.10, profit:   76.20 },
+    { openIdx: 170, closeIdx: 178, type: 'buy',  lots: 0.10, profit:  -52.40 },
+    { openIdx: 200, closeIdx: 260, type: 'buy',  lots: 0.10, profit:  288.00 },
+    { openIdx: 275, closeIdx: 285, type: 'sell', lots: 0.10, profit:   94.10 },
+    { openIdx: 300, closeIdx: 310, type: 'buy',  lots: 0.10, profit:  -45.00 },
+    { openIdx: 330, closeIdx: 410, type: 'buy',  lots: 0.10, profit:  342.80 },
+    { openIdx: 430, closeIdx: 442, type: 'sell', lots: 0.10, profit:  -61.50 },
+    { openIdx: 460, closeIdx: 510, type: 'buy',  lots: 0.10, profit:  196.40 },
+    { openIdx: 530, closeIdx: 545, type: 'sell', lots: 0.10, profit:  108.20 },
+    { openIdx: 560, closeIdx: 570, type: 'buy',  lots: 0.10, profit:  -43.80 },
+    { openIdx: 590, closeIdx: 680, type: 'buy',  lots: 0.10, profit:  412.60 },
+    { openIdx: 700, closeIdx: 715, type: 'sell', lots: 0.10, profit:   82.30 },
+  ];
+  trades = tradeData.map(td => {
+    if (td.openIdx >= rawCandles.length || td.closeIdx >= rawCandles.length) return null;
+    const oc = rawCandles[td.openIdx];
+    const cc = rawCandles[td.closeIdx];
+    return {
+      openTime: oc.t, closeTime: cc.t,
+      type: td.type, lots: td.lots,
+      openPrice: oc.c, closePrice: cc.c, profit: td.profit
+    };
+  }).filter(Boolean);
+}
 
 function generateSample() {
   rawCandles = [];
@@ -617,6 +676,123 @@ function updateStats() {
   `;
 }
 
+// ===== ZIGZAG =====
+function calcZigZag(depth, deviationPct, backstep) {
+  const n = candles.length;
+  if (n < depth * 2) return [];
+
+  // Step1: ローカル高値・安値候補を検出
+  const highMap = new Array(n).fill(0);
+  const lowMap  = new Array(n).fill(0);
+  for (let i = depth; i < n - depth; i++) {
+    let isHigh = true, isLow = true;
+    for (let j = Math.max(0, i - depth); j <= Math.min(n-1, i + depth); j++) {
+      if (j === i) continue;
+      if (candles[j].h >= candles[i].h) isHigh = false;
+      if (candles[j].l <= candles[i].l) isLow  = false;
+    }
+    if (isHigh) highMap[i] = candles[i].h;
+    if (isLow)  lowMap[i]  = candles[i].l;
+  }
+
+  // Step2: backstepを考慮しながらピボットを確定
+  const pivots = []; // {idx, price, type:'high'|'low'}
+  let lastType  = null;
+  let lastPrice = 0;
+  let lastIdx   = -1;
+
+  for (let i = 0; i < n; i++) {
+    const isHigh = highMap[i] > 0;
+    const isLow  = lowMap[i]  > 0;
+    if (!isHigh && !isLow) continue;
+
+    if (isHigh) {
+      const price = highMap[i];
+      if (lastType === 'high') {
+        // 同方向: より高ければ更新
+        if (price > lastPrice && i - lastIdx >= backstep) {
+          pivots[pivots.length - 1] = { idx: i, price, type: 'high' };
+          lastPrice = price; lastIdx = i;
+        }
+      } else {
+        // 方向転換: deviation確認
+        const dev = lastType === null ? Infinity : (price - lastPrice);
+        if (dev >= deviationPct && i - lastIdx >= backstep) {
+          pivots.push({ idx: i, price, type: 'high' });
+          lastType = 'high'; lastPrice = price; lastIdx = i;
+        }
+      }
+    }
+
+    if (isLow) {
+      const price = lowMap[i];
+      if (lastType === 'low') {
+        if (price < lastPrice && i - lastIdx >= backstep) {
+          pivots[pivots.length - 1] = { idx: i, price, type: 'low' };
+          lastPrice = price; lastIdx = i;
+        }
+      } else {
+        const dev = lastType === null ? Infinity : (lastPrice - price);
+        if (dev >= deviationPct && i - lastIdx >= backstep) {
+          pivots.push({ idx: i, price, type: 'low' });
+          lastType = 'low'; lastPrice = price; lastIdx = i;
+        }
+      }
+    }
+  }
+  return pivots;
+}
+
+function drawZigZag(toX, toY, bodyW, start, end) {
+  if (!document.getElementById('zzEn').checked) return;
+  const depth    = parseInt(document.getElementById('zzDepth').value) || 12;
+  const dev      = parseFloat(document.getElementById('zzDev').value)  || 5;
+  const backstep = parseInt(document.getElementById('zzBack').value)   || 3;
+  const color    = document.getElementById('zzCol').value;
+
+  const pivots = calcZigZag(depth, dev, backstep);
+  // 表示範囲内のピボットのみ + 前後1点
+  const visible = pivots.filter((p, i) => {
+    if (p.idx >= start && p.idx < end) return true;
+    // 直前・直後の点も含めてラインが途切れないように
+    const prev = pivots[i-1], next = pivots[i+1];
+    if (prev && prev.idx >= start && prev.idx < end) return true;
+    if (next && next.idx >= start && next.idx < end) return true;
+    return false;
+  });
+
+  if (visible.length < 2) return;
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  for (let i = 0; i < visible.length; i++) {
+    const p = visible[i];
+    const vi = p.idx - start;
+    const x = toX(vi) + bodyW / 2;
+    const y = toY(p.price);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // ピボット点に丸
+  for (const p of visible) {
+    if (p.idx < start || p.idx >= end) continue;
+    const vi = p.idx - start;
+    const x = toX(vi) + bodyW / 2;
+    const y = toY(p.price);
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+}
+
+['zzEn','zzDepth','zzDev','zzBack','zzCol'].forEach(id =>
+  document.getElementById(id).addEventListener('change', render));
+
 // ===== MOVING AVERAGES =====
 function calcMA(type, period) {
   const result = new Array(candles.length).fill(null);
@@ -786,6 +962,9 @@ function render() {
     ctx.fillRect(x, y1, bodyW, Math.max(y2 - y1, 1));
   }
 
+  // --- ZigZag ---
+  drawZigZag(toX, toY, bodyW, start, end);
+
   // --- Moving averages ---
   drawMAs(toX, toY, bodyW, start, end);
 
@@ -865,6 +1044,7 @@ function niceStep(range, n) {
 // ===== MOUSE EVENTS =====
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
+  if (!candles.length) return;
   const { start } = visibleRange();
   const hoverIdx = start + Math.floor(e.offsetX / candleW);
   const factor = e.deltaY < 0 ? 1.12 : 1/1.12;
